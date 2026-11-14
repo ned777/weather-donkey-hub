@@ -406,8 +406,7 @@ class MainActivity : AppCompatActivity() {
         val isCurrentTab = id == WeatherCache.CURRENT_LOCATION_ID
         val hasPermission = LocationHelper.hasPermission(this)
         grantPermissionButton.visibility = if (isCurrentTab && !hasPermission) View.VISIBLE else View.GONE
-        // "home" is the server's own location — it can be moved from the web page, not removed.
-        removeLocationButton.visibility = if (isCurrentTab || id == SERVER_HOME_ID) View.GONE else View.VISIBLE
+        removeLocationButton.visibility = if (isCurrentTab) View.GONE else View.VISIBLE
 
         val snapshot = WeatherCache.read(this, id)
         if (snapshot != null) {
@@ -465,6 +464,13 @@ class MainActivity : AppCompatActivity() {
         local.forEach { loc ->
             val match = serverById[loc.id]
             when {
+                // The server's Home is where the phone usually is too, so it would just
+                // duplicate the Current tab — the app never shows it.
+                loc.id == SERVER_HOME_ID -> {
+                    LocationStore.remove(this, loc.id)
+                    WeatherCache.clear(this, loc.id)
+                    changed = true
+                }
                 match == null -> WeatherClient.addLocation(loc.displayName, loc.lat, loc.lon)
                 !match.active -> {
                     LocationStore.remove(this, loc.id)
@@ -474,7 +480,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val localIds = local.map { it.id }.toSet()
-        server.filter { it.active && it.id != WeatherCache.CURRENT_LOCATION_ID && it.id !in localIds }.forEach {
+        server.filter {
+            it.active && it.id != WeatherCache.CURRENT_LOCATION_ID && it.id != SERVER_HOME_ID && it.id !in localIds
+        }.forEach {
             LocationStore.add(this, SavedLocation(it.id, it.name, it.lat, it.lon))
             changed = true
         }
