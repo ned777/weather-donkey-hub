@@ -323,7 +323,7 @@
       </div>
     </section>
   </div>
-  <footer>Weather from Open-Meteo &amp; MET Norway · history from your server's recordings and the Open-Meteo archive</footer>
+  <footer>Weather from Open-Meteo, MET Norway &amp; 7Timer! · history from your server's recordings and the Open-Meteo archive</footer>
 </div>
 
 <script>
@@ -359,6 +359,7 @@ const minutesOf = iso => +iso.slice(11, 13) * 60 + +iso.slice(14, 16);
 const fmtDate = (iso, opts) => new Date(iso + "T12:00:00").toLocaleDateString([], opts);
 const ago = ts => { const m = Math.round((Date.now() / 1000 - ts) / 60); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
 
+const SOURCE_NAMES = { "open-meteo": "Open-Meteo", "met-norway": "MET Norway", "7timer": "7Timer!" };
 let locations = [], active = null, lastSnapshot = null, lastHistory = null;
 
 async function api(path, method = "GET") {
@@ -463,10 +464,10 @@ function renderWeather() {
   const when = new Date(s.fetched_at);
   $("updated").textContent = "Updated " + when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
   const rec = active?.id === "home"
-    ? '<span class="pill"><i></i>Recorded hourly</span>'
+    ? '<span class="pill"><i></i>Recorded every 2 h</span>'
     : '<span class="pill" title="Only Home is recorded; history for this city comes from the archive"><i style="background:#55556a"></i>Live only</span>';
   $("pills").innerHTML = rec + " " + Object.entries(s.sources || {}).map(([k, v]) =>
-    `<span class="pill ${v === "ok" ? "" : "down"}"><i></i>${k === "open-meteo" ? "Open-Meteo" : "MET Norway"}</span>`).join(" ");
+    `<span class="pill ${v === "ok" ? "" : "down"}" title="${v}"><i></i>${SOURCE_NAMES[k] || k}</span>`).join(" ");
   $("notice").hidden = !s.notice;
   $("notice").textContent = s.notice || "";
 
@@ -674,6 +675,7 @@ async function loadStats() {
       row("Last recorded", h.last_recorded ? ago(h.last_recorded) : "—"),
       row("Next recording", new Date(h.next_recording * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })),
       row("Database", kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.round(kb)} KB`),
+      row("Records Home", `every ${h.record_every_hours} hours`),
       row("Keeps", `${h.retention_years} years`),
     ].join("");
   } catch (e) { /* stats are a nice-to-have */ }

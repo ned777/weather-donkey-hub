@@ -5,13 +5,14 @@ widget look and work the same as before, but they no longer talk to a weather
 service themselves. Everything goes through a small server on the home network
 that:
 
-- **Pulls from two free, open sources.** [Open-Meteo](https://open-meteo.com) is
-  the main one and [MET Norway](https://api.met.no) is the backup. If one is down,
-  the other is used on its own and the app shows a small yellow note such as
-  *"Open-Meteo unavailable — showing MET Norway only"*. The widget's status line
-  shortens it to *"· MET Norway only"*.
-- **Records the weather every hour for its own location only.** Home is where
-  this computer is, and it's recorded from both sources into a local SQLite
+- **Pulls from three free, keyless, worldwide sources.** It tries
+  [Open-Meteo](https://open-meteo.com) first, then [MET Norway](https://api.met.no),
+  then [7Timer!](https://www.7timer.info), which is built on NOAA's global model.
+  Any source that's down is skipped, and the app shows a small yellow note such
+  as *"Open-Meteo unavailable — showing MET Norway"*. The widget's status line
+  shortens it to *"· MET Norway"*. A request fails only if all three are down.
+- **Records the weather every 2 hours for its own location only.** Home is where
+  this computer is, and it's recorded from every source that answers into a local SQLite
   database. Saved cities and the phone's **Current** (GPS) tab show live
   weather but are **never recorded**, wherever you are.
 - **Keeps 10 years of recordings**, then deletes anything older automatically.
@@ -82,7 +83,7 @@ sudo ufw allow from 192.168.1.0/24 to any port 8094 proto tcp
 
 | Call | What it does |
 |---|---|
-| `GET /api/weather?id=&name=&lat=&lon=` | Fresh weather from both sources, in the app's snapshot format (plus `notice`, `sources` and `details`). Recorded only for `id=home`. 503 only if **both** sources are down. |
+| `GET /api/weather?id=&name=&lat=&lon=` | Fresh weather from all three sources, in the app's snapshot format (plus `notice`, `sources` and `details`). Recorded only for `id=home`. 503 only if **all three** are down. |
 | `GET /api/history?id=&lat=&lon=&date=YYYY-MM-DD[&time=HH:MM]` | That day's high/low/condition/wind/sunrise/sunset, plus that hour's reading if a time is given. `source` is `recorded` or `archive`. |
 | `GET /api/locations[?all=1]` | Home and saved cities (`all=1` also lists removed ones). |
 | `GET /api/search?q=` | Find a city by name or US ZIP code (Open-Meteo geocoding, Zippopotam.us). |
@@ -99,14 +100,16 @@ Only Home is stored.
   WMO weather code, day/night, wind, rain chance). Refreshing again within the
   same hour overwrites that hour's row.
 - `daily`: one row per source, per day (high/low, condition,
-  wind, rain chance, sunrise/sunset). It's updated every hour, so it ends up as
+  wind, rain chance, sunrise/sunset). It's updated every 2 hours, so it ends up as
   that day's summary.
-- Anything older than 10 years is deleted every night at 03:02.
+- Anything older than 10 years is deleted every night at 02:02.
 
-MET Norway's data is converted to Open-Meteo's terms (°F, mph, WMO codes).
-MET Norway has no rain-chance percentage outside the Nordic countries, so while
-it's the only source, rain chance shows as `--%`. Sunrise and sunset are
-calculated on the server when MET Norway is the only source.
+MET Norway and 7Timer! are converted to Open-Meteo's terms (°F, mph, WMO weather
+codes). Neither has a rain-chance percentage (MET Norway only has one in the
+Nordic countries), so while one of them is the main source, rain chance shows as
+`--%`. 7Timer! comes in 3-hour steps, and the 12-hour strip fills the hours in
+between. When Open-Meteo is down, the server calculates sunrise and sunset
+itself.
 
 ## App
 

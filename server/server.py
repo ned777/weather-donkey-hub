@@ -6,12 +6,11 @@ Same philosophy as Cookbook and Vehicle Maintenance Record: one file, plain
 Python stdlib, nothing to pip install.
 
 What it does:
-  * Pulls weather from TWO free, keyless, open sources — Open-Meteo
-    (primary) and MET Norway (backup). If one is down, the other is used on
-    its own and the response carries a short `notice` saying so; only if both
-    are down does a request fail.
-  * Records ONLY its own location ("Home" — where this computer is) once an
-    hour, plus whenever Home is refreshed, into a local SQLite database.
+  * Pulls weather from THREE free, keyless, worldwide sources — Open-Meteo
+    (primary), MET Norway and 7Timer! (backups). Whatever is down is skipped and the response carries a short
+    `notice` saying so; a request fails only if every source is down.
+  * Records ONLY its own location ("Home" — where this computer is) every
+    2 hours, plus whenever Home is refreshed, into a local SQLite database.
     Saved cities and the phone's GPS position are shown live, never recorded.
   * Keeps those recordings for 10 years, then deletes them.
   * Answers "what was the weather on <date> [at <time>]?" from its own
@@ -41,7 +40,7 @@ API (all GET unless noted, all JSON):
   POST /api/home?name=&lat=&lon=     — move the server's Home location
   DELETE /api/locations?id=<loc id>  — stop recording (history is kept)
 
-Recording: ONLY Home (the server's own location), hourly. Saved cities and the
+Recording: ONLY Home (the server's own location), every 2 hours. Saved cities and the
 phone's "Current" (GPS) tab are shown live and never recorded; their history
 comes from the Open-Meteo archive (or Home's recordings when within 10 km).
 """
@@ -73,7 +72,8 @@ HOURLY_COUNT = 12          # the app's "Next 12 Hours" strip
 FORECAST_DAYS = 5          # the app's "5-Day Forecast" list (after today)
 HTTP_TIMEOUT_S = 8
 RETRY_DELAYS_S = (1.5,)    # one retry per source; both sources run in parallel
-RECORD_MINUTE = 2          # hourly recording runs at HH:02
+RECORD_EVERY_HOURS = 2     # Home is recorded every 2 hours (00:02, 02:02, …)
+RECORD_MINUTE = 2
 
 # MET Norway's terms require a User-Agent that identifies the app.
 USER_AGENT = "WeatherDonkeyHub/1.0 (+https://github.com/ned777/weather-donkey-hub)"
@@ -89,7 +89,11 @@ NEARBY_KM = 10
 
 SOURCE_OPEN_METEO = "open-meteo"
 SOURCE_MET = "met-norway"
-SOURCE_LABELS = {SOURCE_OPEN_METEO: "Open-Meteo", SOURCE_MET: "MET Norway"}
+SOURCE_7TIMER = "7timer"
+SOURCE_LABELS = {SOURCE_OPEN_METEO: "Open-Meteo", SOURCE_MET: "MET Norway", SOURCE_7TIMER: "7Timer!"}
+# All three are free, keyless and worldwide. When several answer, the first one
+# here is shown: Open-Meteo (most detail), MET Norway (hourly), 7Timer! (3-hourly).
+SOURCE_PRIORITY = (SOURCE_OPEN_METEO, SOURCE_MET, SOURCE_7TIMER)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("weather-donkey")
@@ -284,15 +288,21 @@ def record(loc_id, lat, lon, data):
             )
 
 
+def _next_recording(now):
+    """Next HH:02 where HH is a multiple of RECORD_EVERY_HOURS (00:02, 02:02, …)."""
+    run = now.replace(minute=RECORD_MINUTE, second=0, microsecond=0)
+    run -= timedelta(hours=run.hour % RECORD_EVERY_HOURS)
+    while run <= now:
+        run += timedelta(hours=RECORD_EVERY_HOURS)
+    return run
+
+
 def health_stats():
     with _db_lock, db() as conn:
         obs = conn.execute("SELECT COUNT(*), MIN(hour_utc), MAX(recorded_at) FROM observations").fetchone()
         days = conn.execute("SELECT COUNT(DISTINCT location_id || date) FROM daily").fetchone()[0]
     size = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
-    now = datetime.now()
-    next_run = now.replace(minute=RECORD_MINUTE, second=0, microsecond=0)
-    if next_run <= now:
-        next_run += timedelta(hours=1)
+    next_run = _next_recording(datetime.now())
     return {
         "ok": True,
         "locations": len(active_locations()),
@@ -303,6 +313,7 @@ def health_stats():
         "next_recording": int(next_run.timestamp()),
         "db_bytes": size,
         "retention_years": RETENTION_YEARS,
+        "record_every_hours": RECORD_EVERY_HOURS,
     }
 
 
@@ -571,7 +582,113 @@ def fetch_met(lat, lon, tz):
 
 
 # ---------------------------------------------------------------------------
-# Combining the two sources
+# Source 3: 7Timer! (7timer.info) — free, keyless, worldwide, built on NOAA's
+# global GFS model. 3-hourly steps for 8 days, in Celsius, with wind and cloud
+# cover as small category scales and a weather word ("lightrainday"). No rain
+# probability, so rain chance is -1 ("unknown"). Hours in between the 3-hour
+# steps are filled in by straight-line interpolation for the 12-hour strip.
+# ---------------------------------------------------------------------------
+
+_7TIMER_WIND_MPH = {1: 0.5, 2: 4, 3: 13, 4: 21, 5: 31, 6: 47, 7: 64, 8: 80}  # category midpoints
+_7TIMER_CLOUD_PCT = {1: 3, 2: 12, 3: 25, 4: 37, 5: 50, 6: 62, 7: 75, 8: 87, 9: 97}
+
+
+def seven_timer_to_wmo(word):
+    w = (word or "").replace("day", "").replace("night", "")
+    return {
+        "clear": 0, "pcloudy": 2, "mcloudy": 3, "cloudy": 3, "humid": 3,
+        "lightrain": 61, "oshower": 80, "ishower": 80, "rain": 63,
+        "lightsnow": 71, "snow": 73, "rainsnow": 66, "ts": 95, "tsrain": 95,
+    }.get(w, 3)
+
+
+def fetch_7timer(lat, lon, tz):
+    j = http_get_json("https://www.7timer.info/bin/api.pl?"
+                      + urlencode({"lon": round(lon, 3), "lat": round(lat, 3),
+                                   "product": "civil", "output": "json"}))
+    init = datetime.strptime(j["init"], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    sun_cache = {}
+
+    def daylight(t):
+        # 7Timer's day/night word covers a whole 3-hour block, so use the real sun instead.
+        if t.date() not in sun_cache:
+            sun_cache[t.date()] = sun_times(t.date(), lat, lon, tz)
+        rise, sset = sun_cache[t.date()]
+        return rise <= t < sset if rise else 4 <= t.month <= 9
+
+    pts = []
+    for e in j["dataseries"]:
+        t = (init + timedelta(hours=e["timepoint"])).astimezone(tz)
+        word = e.get("weather", "")
+        wind = e.get("wind10m") or {}
+        pts.append({
+            "t": t, "temp_f": c_to_f(e["temp2m"]), "code": seven_timer_to_wmo(word),
+            "is_day": daylight(t), "wind_mph": _7TIMER_WIND_MPH.get(wind.get("speed"), 0.0),
+            "wind_dir": _COMPASS_DEG.get(wind.get("direction")),
+            "humidity": int(str(e.get("rh2m", "")).rstrip("%")) if str(e.get("rh2m", "")).rstrip("%").lstrip("-").isdigit() else None,
+            "cloud_pct": _7TIMER_CLOUD_PCT.get(e.get("cloudcover")),
+        })
+    if not pts:
+        raise ValueError("7Timer returned no data")
+
+    now_local = datetime.now(timezone.utc).astimezone(tz)
+
+    def at(t):
+        """Interpolated temperature/wind at time t; condition from the step in progress."""
+        before = [p for p in pts if p["t"] <= t]
+        after = [p for p in pts if p["t"] > t]
+        a = before[-1] if before else pts[0]
+        if not after or not before:
+            return dict(a)
+        b = after[0]
+        f = (t - a["t"]) / (b["t"] - a["t"])
+        out = dict(a)
+        out["temp_f"] = a["temp_f"] + (b["temp_f"] - a["temp_f"]) * f
+        out["wind_mph"] = a["wind_mph"] + (b["wind_mph"] - a["wind_mph"]) * f
+        out["is_day"] = daylight(t)
+        return out
+
+    cur = at(now_local)
+    current = {
+        "time": local_iso_minute(now_local), "temp_f": cur["temp_f"], "code": cur["code"],
+        "is_day": cur["is_day"], "wind_mph": cur["wind_mph"],
+        "details": {"feels_like_f": None, "humidity": cur["humidity"], "pressure_hpa": None,
+                    "wind_dir": cur["wind_dir"], "gust_mph": None, "cloud_pct": cur["cloud_pct"],
+                    "uv": None, "uv_max": None},
+    }
+    first_hour = now_local.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    hourly = []
+    for k in range(HOURLY_COUNT):
+        t = first_hour + timedelta(hours=k)
+        h = at(t)
+        hourly.append({"time": local_iso_minute(t), "temp_f": h["temp_f"], "code": h["code"],
+                       "is_day": h["is_day"], "wind_mph": h["wind_mph"], "rain_pct": -1})
+
+    by_day = {}
+    for p in pts:
+        by_day.setdefault(p["t"].date(), []).append(p)
+    days = []
+    for i in range(FORECAST_DAYS + 1):
+        day = now_local.date() + timedelta(days=i)
+        ps = by_day.get(day)
+        if not ps:
+            continue
+        temps = [p["temp_f"] for p in ps] + ([current["temp_f"]] if i == 0 else [])
+        rise, sset = sun_times(day, lat, lon, tz)
+        days.append({
+            "date": day.isoformat(), "high_f": max(temps), "low_f": min(temps),
+            "code": max(p["code"] for p in ps), "wind_mph": max(p["wind_mph"] for p in ps),
+            "rain_pct": -1, "sunrise": local_iso_minute(rise), "sunset": local_iso_minute(sset),
+        })
+    return {"source": SOURCE_7TIMER, "tz": None, "current": current, "hourly": hourly, "days": days}
+
+
+_COMPASS_DEG = {d: i * 22.5 for i, d in enumerate(
+    "N NNE NE ENE E ESE SE SSE S SSW SW WSW W WNW NW NNW".split())}
+
+
+# ---------------------------------------------------------------------------
+# Combining the sources
 # ---------------------------------------------------------------------------
 
 _pool = ThreadPoolExecutor(max_workers=8)
@@ -589,10 +706,13 @@ def fetch_and_record(loc_id, lat, lon, record_it=True):
         tz = zone_for(near[0].get("tz") if near else None, lon)
     else:
         tz = zone_for(loc.get("tz"), lon)
-    om_future = _pool.submit(fetch_open_meteo, lat, lon)
-    met_future = _pool.submit(fetch_met, lat, lon, tz)
+    futures = (
+        (SOURCE_OPEN_METEO, _pool.submit(fetch_open_meteo, lat, lon)),
+        (SOURCE_MET, _pool.submit(fetch_met, lat, lon, tz)),
+        (SOURCE_7TIMER, _pool.submit(fetch_7timer, lat, lon, tz)),
+    )
     results, statuses = {}, {}
-    for source, fut in ((SOURCE_OPEN_METEO, om_future), (SOURCE_MET, met_future)):
+    for source, fut in futures:
         try:
             results[source] = fut.result()
             statuses[source] = "ok"
@@ -600,12 +720,12 @@ def fetch_and_record(loc_id, lat, lon, record_it=True):
             statuses[source] = "unavailable"
             log.warning("%s failed for %s: %s: %s", source, loc_id, type(e).__name__, e)
 
-    om = results.get(SOURCE_OPEN_METEO)
-    primary = om or results.get(SOURCE_MET)
+    primary = next((results[s] for s in SOURCE_PRIORITY if s in results), None)
     if not record_it:
         return primary, statuses
-    if om and om["tz"] and (not loc or loc.get("tz") != om["tz"]):
-        set_location_tz(loc_id, om["tz"])
+    learned_tz = results[SOURCE_OPEN_METEO]["tz"] if SOURCE_OPEN_METEO in results else None
+    if learned_tz and (not loc or loc.get("tz") != learned_tz):
+        set_location_tz(loc_id, learned_tz)
     for data in results.values():
         try:
             record(loc_id, lat, lon, data)
@@ -614,12 +734,12 @@ def fetch_and_record(loc_id, lat, lon, record_it=True):
     return primary, statuses
 
 
-def notice_for(statuses):
-    down = [s for s, st in statuses.items() if st != "ok"]
-    up = [s for s, st in statuses.items() if st == "ok"]
-    if not down or not up:
+def notice_for(statuses, primary_source):
+    """e.g. "Open-Meteo unavailable — showing MET Norway". None when nothing is down."""
+    down = [SOURCE_LABELS[s] for s in SOURCE_PRIORITY if statuses.get(s) == "unavailable"]
+    if not down or not primary_source:
         return None
-    return f"{SOURCE_LABELS[down[0]]} unavailable — showing {SOURCE_LABELS[up[0]]} only"
+    return f"{' & '.join(down)} unavailable — showing {SOURCE_LABELS[primary_source]}"
 
 
 def to_app_snapshot(data, name, notice, statuses):
@@ -689,7 +809,7 @@ def lookup_history(loc_id, lat, lon, day, hour):
 
 def _pick_source(rows):
     by_source = {r["source"]: r for r in rows}
-    return by_source.get(SOURCE_OPEN_METEO) or by_source.get(SOURCE_MET)
+    return next((by_source[s] for s in SOURCE_PRIORITY if s in by_source), None)
 
 
 def _history_from_records(loc_id, day, hour):
@@ -794,9 +914,7 @@ def recorder_loop():
     purge_old_records()
     while True:
         now = datetime.now()
-        next_run = now.replace(minute=RECORD_MINUTE, second=0, microsecond=0)
-        if next_run <= now:
-            next_run += timedelta(hours=1)
+        next_run = _next_recording(now)
         time.sleep((next_run - now).total_seconds())
         for loc in [l for l in active_locations() if l["id"] == HOME_ID]:
             try:
@@ -804,7 +922,7 @@ def recorder_loop():
                 log.info("Recorded %s (%s): %s", loc["id"], loc["name"], statuses)
             except Exception:
                 log.exception("Hourly recording failed for %s", loc["id"])
-        if next_run.hour == 3:
+        if next_run.hour == 2:
             purge_old_records()
 
 
@@ -871,9 +989,9 @@ class Handler(BaseHTTPRequestHandler):
                     lat, lon, name = home["lat"], home["lon"], home["name"]
                 data, statuses = fetch_and_record(loc_id, lat, lon, record_it)
                 if data is None:
-                    return self._send(503, {"error": "Both weather services are unavailable",
+                    return self._send(503, {"error": "All weather services are unavailable",
                                             "sources": statuses})
-                return self._send(200, to_app_snapshot(data, name, notice_for(statuses), statuses))
+                return self._send(200, to_app_snapshot(data, name, notice_for(statuses, data["source"]), statuses))
 
             if path == "/api/history":
                 lat, lon = self._coords(p)
