@@ -10,10 +10,10 @@ that:
   the other is used on its own and the app shows a small yellow note such as
   *"Open-Meteo unavailable — showing MET Norway only"*. The widget's status line
   shortens it to *"· MET Norway only"*.
-- **Records the weather every hour** for **Home** (the server's own location)
-  and every added city, from both sources, into a local SQLite database. The
-  phone's **Current** (GPS) tab is shown live but never recorded, so trips don't
-  add stray places to the history.
+- **Records the weather every hour for its own location only.** Home is where
+  this computer is, and it's recorded from both sources into a local SQLite
+  database. Saved cities and the phone's **Current** (GPS) tab show live
+  weather but are **never recorded**, wherever you are.
 - **Keeps 10 years of recordings**, then deletes anything older automatically.
 - **Answers "What was the weather?"** for any date (and optionally a time). It
   uses its own recordings first. For dates it never recorded, it falls back to
@@ -30,13 +30,13 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
   style with current conditions (feels-like, humidity, wind direction and gusts,
   pressure, cloud cover, UV, and a daylight bar), the 12-hour and 5-day
   forecasts, *What Was the Weather?*, the °F ⇄ °C converter, and location
-  management. You can add a city by name or US ZIP code, remove a city, or move
-  Home.
+  management. You can save a city by name or US ZIP code to view it, remove a
+  city, or move Home if the server moves.
 - **Keeps the app and the web page in sync.** Cities added or removed on either
   one carry over to the other on the app's next pull-to-refresh.
-- **Finds history for any spot.** Lookups use a recorded location within 10 km
-  when there is one (so Current at home uses Home's recordings), and the
-  archive otherwise.
+- **Finds history for any spot.** Lookups within 10 km of Home use the
+  server's own recordings. Anywhere else, including saved cities and wherever
+  your phone is, they use the archive.
 
 The server is home-network only. Away from home Wi‑Fi, the app and widget keep
 showing the last weather they loaded, with *"Can't reach Weather Donkey server
@@ -81,21 +81,23 @@ sudo ufw allow from 192.168.1.0/24 to any port 8094 proto tcp
 
 | Call | What it does |
 |---|---|
-| `GET /api/weather?id=&name=&lat=&lon=` | Fresh weather from both sources, recorded, returned in the app's snapshot format (plus `notice` and `sources`). Also registers the location for hourly recording. 503 only if **both** sources are down. |
+| `GET /api/weather?id=&name=&lat=&lon=` | Fresh weather from both sources, in the app's snapshot format (plus `notice`, `sources` and `details`). Recorded only for `id=home`. 503 only if **both** sources are down. |
 | `GET /api/history?id=&lat=&lon=&date=YYYY-MM-DD[&time=HH:MM]` | That day's high/low/condition/wind/sunrise/sunset, plus that hour's reading if a time is given. `source` is `recorded` or `archive`. |
-| `GET /api/locations[?all=1]` | Locations being recorded (`all=1` also lists removed ones). |
+| `GET /api/locations[?all=1]` | Home and saved cities (`all=1` also lists removed ones). |
 | `GET /api/search?q=` | Find a city by name or US ZIP code (Open-Meteo geocoding, Zippopotam.us). |
-| `POST /api/locations?name=&lat=&lon=` | Start recording a city. |
+| `POST /api/locations?name=&lat=&lon=` | Save a city (a tab on the app and web page; not recorded). |
 | `POST /api/home?name=&lat=&lon=` | Move the server's Home location. |
-| `DELETE /api/locations?id=` | Stop recording a location (removing a tab in the app does this). Its history is kept. |
+| `DELETE /api/locations?id=` | Remove a saved city (removing a tab in the app does this). Home can't be removed. |
 | `GET /api/health` | Liveness check. |
 
 ### What's stored
 
-- `observations`: one row per location, per source, per hour (temperature,
+Only Home is stored.
+
+- `observations`: one row per source, per hour (temperature,
   WMO weather code, day/night, wind, rain chance). Refreshing again within the
   same hour overwrites that hour's row.
-- `daily`: one row per location, per source, per day (high/low, condition,
+- `daily`: one row per source, per day (high/low, condition,
   wind, rain chance, sunrise/sunset). It's updated every hour, so it ends up as
   that day's summary.
 - Anything older than 10 years is deleted every night at 03:02.

@@ -10,8 +10,9 @@ What it does:
     (primary) and MET Norway (backup). If one is down, the other is used on
     its own and the response carries a short `notice` saying so; only if both
     are down does a request fail.
-  * Records every location the app knows about once an hour (plus every
-    time the phone refreshes), into a local SQLite database.
+  * Records ONLY its own location ("Home" — where this computer is) once an
+    hour, plus whenever Home is refreshed, into a local SQLite database.
+    Saved cities and the phone's GPS position are shown live, never recorded.
   * Keeps those recordings for 10 years, then deletes them.
   * Answers "what was the weather on <date> [at <time>]?" from its own
     recordings first, falling back to Open-Meteo's historical archive (back
@@ -30,18 +31,19 @@ lookups, and the °F/°C converter, in the same look as the app.
 API (all GET unless noted, all JSON):
   /api/health
   /api/weather?id=<loc id>&name=<display name>&lat=<lat>&lon=<lon>
-      Fetches fresh weather, records it, registers the location for hourly
-      recording, and returns a snapshot in exactly the shape the app caches.
+      Fetches fresh weather in exactly the shape the app caches.
+      Recorded only when id=home (the server's own location).
   /api/history?id=<loc id>&lat=<lat>&lon=<lon>&date=YYYY-MM-DD[&time=HH:MM]
       What the weather was on that day (and at that hour, if given).
-  /api/locations[?all=1]             — locations being recorded (all=1: also removed ones)
+  /api/locations[?all=1]             — Home + saved cities (all=1: also removed ones)
   /api/search?q=<city or US ZIP>     — find places to add
-  POST /api/locations?name=&lat=&lon= — start recording a city
+  POST /api/locations?name=&lat=&lon= — save a city (shown as a tab, not recorded)
   POST /api/home?name=&lat=&lon=     — move the server's Home location
   DELETE /api/locations?id=<loc id>  — stop recording (history is kept)
 
-Recording: Home (the server's own location) plus every added city, hourly.
-The phone's "Current" (GPS) tab is shown live but never recorded.
+Recording: ONLY Home (the server's own location), hourly. Saved cities and the
+phone's "Current" (GPS) tab are shown live and never recorded; their history
+comes from the Open-Meteo archive (or Home's recordings when within 10 km).
 """
 import json
 import logging
@@ -796,8 +798,7 @@ def recorder_loop():
         if next_run <= now:
             next_run += timedelta(hours=1)
         time.sleep((next_run - now).total_seconds())
-        locations = active_locations()
-        for loc in locations:
+        for loc in [l for l in active_locations() if l["id"] == HOME_ID]:
             try:
                 _, statuses = fetch_and_record(loc["id"], loc["lat"], loc["lon"])
                 log.info("Recorded %s (%s): %s", loc["id"], loc["name"], statuses)
@@ -862,10 +863,10 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("id is required")
                 lat, lon = self._coords(p)
                 name = p.get("name") or None
-                record_it = loc_id != CURRENT_ID  # the phone's GPS tab is shown live, never recorded
-                if record_it and loc_id != HOME_ID:
-                    upsert_location(loc_id, name, lat, lon)
-                if loc_id == HOME_ID:
+                # Only the server's own location is ever recorded. Saved cities and the
+                # phone's GPS position are fetched live and never stored.
+                record_it = loc_id == HOME_ID
+                if record_it:
                     home = get_location(HOME_ID)
                     lat, lon, name = home["lat"], home["lon"], home["name"]
                 data, statuses = fetch_and_record(loc_id, lat, lon, record_it)
@@ -916,8 +917,7 @@ class Handler(BaseHTTPRequestHandler):
             name = (p.get("name") or "").strip() or f"{lat:.2f}, {lon:.2f}"
             if path == "/api/locations":
                 loc_id = location_id_for(lat, lon)
-                upsert_location(loc_id, name, lat, lon)
-                _pool.submit(fetch_and_record, loc_id, lat, lon)  # first recording right away
+                upsert_location(loc_id, name, lat, lon)  # saved for tabs only — not recorded
                 return self._send(200, {"location": get_location(loc_id)})
             if path == "/api/home":
                 set_home(name, lat, lon)

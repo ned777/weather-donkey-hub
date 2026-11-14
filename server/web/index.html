@@ -311,7 +311,7 @@
 
     <!-- LOCATIONS + SERVER -->
     <section class="card c-locs">
-      <div class="card-head"><h2>Locations</h2><span class="meta">recorded hourly</span></div>
+      <div class="card-head"><h2>Locations</h2><span class="meta">only Home is recorded</span></div>
       <div class="card-body">
         <div class="search">
           <input type="text" id="q" placeholder="Add a city or ZIP code" autocomplete="off">
@@ -462,7 +462,10 @@ function renderWeather() {
 
   const when = new Date(s.fetched_at);
   $("updated").textContent = "Updated " + when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-  $("pills").innerHTML = Object.entries(s.sources || {}).map(([k, v]) =>
+  const rec = active?.id === "home"
+    ? '<span class="pill"><i></i>Recorded hourly</span>'
+    : '<span class="pill" title="Only Home is recorded; history for this city comes from the archive"><i style="background:#55556a"></i>Live only</span>';
+  $("pills").innerHTML = rec + " " + Object.entries(s.sources || {}).map(([k, v]) =>
     `<span class="pill ${v === "ok" ? "" : "down"}"><i></i>${k === "open-meteo" ? "Open-Meteo" : "MET Norway"}</span>`).join(" ");
   $("notice").hidden = !s.notice;
   $("notice").textContent = s.notice || "";
@@ -601,9 +604,9 @@ function renderLocList() {
       row.insertAdjacentHTML("afterbegin", '<span class="badge">HOME</span>');
     } else {
       const rm = document.createElement("button");
-      rm.className = "rm"; rm.textContent = "✕ Remove"; rm.title = "Stop recording (history is kept)";
+      rm.className = "rm"; rm.textContent = "✕ Remove"; rm.title = "Remove this saved city";
       rm.onclick = async () => {
-        if (!confirm(`Stop recording ${loc.name}? Its history is kept.`)) return;
+        if (!confirm(`Remove ${loc.name}?`)) return;
         await api("/api/locations?id=" + encodeURIComponent(loc.id), "DELETE");
         await loadLocations(active?.id === loc.id ? "home" : active?.id);
         if (active?.id === "home") loadWeather();
