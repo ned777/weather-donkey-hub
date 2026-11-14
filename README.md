@@ -27,9 +27,11 @@ that:
   which source it came from.
 
 ```
-phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ──▶  Open-Meteo
-                                       (Mint box, SQLite)         └─▶  MET Norway
-                                                                  └─▶  Open-Meteo archive
+phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ──▶  Open-Meteo  ┐
+                                       (Mint box, SQLite)         ├─▶  MET Norway  ├ averaged
+                                                                  ├─▶  7Timer!     ┘
+                                                                  ├─▶  Open-Meteo archive
+                                                                  └─▶  Wikipedia (On This Day, yearly)
 ```
 
 - **Has its own web page** at http://192.168.1.5:8094: a pure-black (AMOLED)
@@ -128,9 +130,14 @@ export JAVA_HOME=<path to a JDK 17>
 The server address is `SERVER_URL` in `android/app/build.gradle.kts`. Plain
 HTTP is allowed only to that one address (`res/xml/network_security_config.xml`).
 
-The app keeps everything the original had: location tabs, pull-to-refresh, the
-outlined temperature, °F/°C, the 12-hour strip, the 5-day forecast, the converter
-and per-widget locations. One pull-to-refresh now updates **every tab at once**
+The app screen uses the same card layout as the web page (pure black, teal-bordered
+cards): a one-line header with °F | °C, the location tabs, a **Right Now** card with
+source chips (Average · Open-Meteo · MET Norway · 7Timer!, each with its temperature),
+the outlined temperature beside the condition, an 8-box details grid and a sunrise/sunset
+bar, then **Next 12 Hours**, **5-Day Forecast** (with range bars), **What Was the
+Weather?** and the converter. Tapping a source chip switches the app (and the widget)
+to that source's own forecast; Average is the default. It keeps everything the original
+had: location tabs, pull-to-refresh, the outlined temperature, °F/°C and per-widget locations. One pull-to-refresh now updates **every tab at once**
 (in parallel, all through the server), sideways swipes never trigger a refresh,
 and tabs slide in when you swipe between them. The server's Home isn't shown as
 an app tab, since it would duplicate Current. It adds a **What Was the Weather?** section: pick a
