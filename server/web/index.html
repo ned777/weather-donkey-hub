@@ -29,8 +29,6 @@
   .tabs button:hover { color: var(--white); }
   .tabs button.active { color: var(--cyan); border-bottom-color: var(--cyan); }
   .tabs .add { color: var(--teal); }
-  .tabs .x { color: var(--faint); font-size: 12px; padding: 0 2px; border-radius: 4px; line-height: 1; }
-  .tabs .x:hover { color: #ff9a9a; }
   .badge { font-size: 9.5px; letter-spacing: .1em; color: #000; background: var(--teal); border-radius: 4px; padding: 1px 4px; }
   .units { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex: 0 0 auto; }
   .units button { background: none; border: 0; padding: 6px 12px; font-weight: 700; color: var(--dim); cursor: pointer; }
@@ -386,14 +384,7 @@ function renderTabs() {
     const b = document.createElement("button");
     b.className = loc.id === active?.id ? "active" : "";
     b.textContent = shortName(loc);
-    if (loc.id === "home") {
-      b.insertAdjacentHTML("beforeend", '<span class="badge">HOME</span>');
-    } else {
-      const x = document.createElement("span");
-      x.className = "x"; x.textContent = "✕"; x.title = `Remove ${loc.name}`;
-      x.onclick = e => { e.stopPropagation(); removeLocation(loc); };
-      b.appendChild(x);
-    }
+    if (loc.id === "home") b.insertAdjacentHTML("beforeend", '<span class="badge">HOME</span>');
     b.onclick = () => { active = loc; renderTabs(); loadWeather(); };
     $("tabs").appendChild(b);
   });
