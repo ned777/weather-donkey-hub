@@ -72,6 +72,36 @@ object WeatherClient {
         }
     }
 
+    /** One location the server knows about. `active` = still being recorded hourly. */
+    data class ServerLocation(val id: String, val name: String, val lat: Double, val lon: Double, val active: Boolean)
+
+    /** Every location the server has ever recorded, including removed ones (active = false). */
+    fun listLocations(): Outcome<List<ServerLocation>> =
+        when (val result = request("GET", "/api/locations", mapOf("all" to "1"))) {
+            is Outcome.Ok -> try {
+                val array = JSONObject(result.value).getJSONArray("locations")
+                Outcome.Ok((0 until array.length()).map { i ->
+                    val o = array.getJSONObject(i)
+                    ServerLocation(
+                        id = o.getString("id"),
+                        name = o.optString("name").ifBlank { o.getString("id") },
+                        lat = o.getDouble("lat"),
+                        lon = o.getDouble("lon"),
+                        active = o.optInt("active", 1) == 1
+                    )
+                })
+            } catch (e: Exception) {
+                Outcome.Failed("Server sent a location list the app couldn't read")
+            }
+            is Outcome.Failed -> result
+            Outcome.ServerUnreachable -> Outcome.ServerUnreachable
+        }
+
+    /** Starts hourly recording for a city added in the app. Best-effort. */
+    fun addLocation(name: String, lat: Double, lon: Double) {
+        request("POST", "/api/locations", mapOf("name" to name, "lat" to lat.toString(), "lon" to lon.toString()))
+    }
+
     /** Stops hourly recording for a removed tab. Its history stays on the server. Best-effort. */
     fun forgetLocation(locationId: String) {
         request("DELETE", "/api/locations", mapOf("id" to locationId))

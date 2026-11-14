@@ -53,6 +53,7 @@ import kotlin.math.abs
 class MainActivity : AppCompatActivity() {
 
     companion object {
+        private const val SERVER_HOME_ID = "home"
         private const val TEMP_MAX_SP = 200f
         private const val TEMP_MIN_SP = 70f
 
@@ -351,12 +352,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun addSavedLocation(result: LocationSearchResult) {
         val location = SavedLocation(
-            id = "%.4f,%.4f".format(result.lat, result.lon),
+            // Same id format the server uses ("%.4f,%.4f"), so both sides name a city the same way.
+            id = String.format(Locale.US, "%.4f,%.4f", result.lat, result.lon),
             displayName = result.displayName,
             lat = result.lat,
             lon = result.lon
         )
         LocationStore.add(this, location)
+        Thread { WeatherClient.addLocation(location.displayName, location.lat, location.lon) }.start()
         savedLocations = LocationStore.list(this)
         activeLocationId = location.id
         rebuildTabs() // selecting the new tab triggers renderFromCache() via the listener
@@ -403,7 +406,8 @@ class MainActivity : AppCompatActivity() {
         val isCurrentTab = id == WeatherCache.CURRENT_LOCATION_ID
         val hasPermission = LocationHelper.hasPermission(this)
         grantPermissionButton.visibility = if (isCurrentTab && !hasPermission) View.VISIBLE else View.GONE
-        removeLocationButton.visibility = if (isCurrentTab) View.GONE else View.VISIBLE
+        // "home" is the server's own location — it can be moved from the web page, not removed.
+        removeLocationButton.visibility = if (isCurrentTab || id == SERVER_HOME_ID) View.GONE else View.VISIBLE
 
         val snapshot = WeatherCache.read(this, id)
         if (snapshot != null) {
@@ -448,7 +452,45 @@ class MainActivity : AppCompatActivity() {
         sunsetText.text = "↓ Sunset --:--"
     }
 
+    /**
+     * Brings the city tabs in line with the server (runs on every pull-to-refresh):
+     * cities added on the web page appear, cities removed there disappear, and
+     * cities added here while away from home get registered.
+     */
+    private fun syncLocationsWithServer() {
+        val server = (WeatherClient.listLocations() as? WeatherClient.Outcome.Ok)?.value ?: return
+        val serverById = server.associateBy { it.id }
+        val local = LocationStore.list(this)
+        var changed = false
+        local.forEach { loc ->
+            val match = serverById[loc.id]
+            when {
+                match == null -> WeatherClient.addLocation(loc.displayName, loc.lat, loc.lon)
+                !match.active -> {
+                    LocationStore.remove(this, loc.id)
+                    WeatherCache.clear(this, loc.id)
+                    changed = true
+                }
+            }
+        }
+        val localIds = local.map { it.id }.toSet()
+        server.filter { it.active && it.id != WeatherCache.CURRENT_LOCATION_ID && it.id !in localIds }.forEach {
+            LocationStore.add(this, SavedLocation(it.id, it.name, it.lat, it.lon))
+            changed = true
+        }
+        if (changed) {
+            runOnUiThread {
+                savedLocations = LocationStore.list(this)
+                if (activeLocationId != WeatherCache.CURRENT_LOCATION_ID && savedLocations.none { it.id == activeLocationId }) {
+                    activeLocationId = WeatherCache.CURRENT_LOCATION_ID
+                }
+                rebuildTabs()
+            }
+        }
+    }
+
     private fun startRefresh() {
+        Thread { syncLocationsWithServer() }.start()
         val id = activeLocationId
         if (id == WeatherCache.CURRENT_LOCATION_ID) {
             if (!LocationHelper.hasPermission(this)) {

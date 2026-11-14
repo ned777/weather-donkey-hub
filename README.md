@@ -10,8 +10,10 @@ that:
   the other is used on its own and the app shows a small yellow note such as
   *"Open-Meteo unavailable — showing MET Norway only"*. The widget's status line
   shortens it to *"· MET Norway only"*.
-- **Records the weather every hour** for every location tab in the app (plus
-  "Current"), from both sources, into a local SQLite database.
+- **Records the weather every hour** for **Home** (the server's own location)
+  and every added city, from both sources, into a local SQLite database. The
+  phone's **Current** (GPS) tab is shown live but never recorded, so trips don't
+  add stray places to the history.
 - **Keeps 10 years of recordings**, then deletes anything older automatically.
 - **Answers "What was the weather?"** for any date (and optionally a time). It
   uses its own recordings first. For dates it never recorded, it falls back to
@@ -24,9 +26,17 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
                                                                   └─▶  Open-Meteo archive
 ```
 
-- **Has its own web page** at http://192.168.1.5:8094, in the same look as the app.
-  It shows current weather for each location, the 12-hour and 5-day forecasts,
-  the *What Was the Weather?* lookup and the °F ⇄ °C converter.
+- **Has its own web page** at http://192.168.1.5:8094: a dashboard in the app's
+  style with current conditions (feels-like, humidity, wind direction and gusts,
+  pressure, cloud cover, UV, and a daylight bar), the 12-hour and 5-day
+  forecasts, *What Was the Weather?*, the °F ⇄ °C converter, and location
+  management. You can add a city by name or US ZIP code, remove a city, or move
+  Home.
+- **Keeps the app and the web page in sync.** Cities added or removed on either
+  one carry over to the other on the app's next pull-to-refresh.
+- **Finds history for any spot.** Lookups use a recorded location within 10 km
+  when there is one (so Current at home uses Home's recordings), and the
+  archive otherwise.
 
 The server is home-network only. Away from home Wi‑Fi, the app and widget keep
 showing the last weather they loaded, with *"Can't reach Weather Donkey server
@@ -73,7 +83,10 @@ sudo ufw allow from 192.168.1.0/24 to any port 8094 proto tcp
 |---|---|
 | `GET /api/weather?id=&name=&lat=&lon=` | Fresh weather from both sources, recorded, returned in the app's snapshot format (plus `notice` and `sources`). Also registers the location for hourly recording. 503 only if **both** sources are down. |
 | `GET /api/history?id=&lat=&lon=&date=YYYY-MM-DD[&time=HH:MM]` | That day's high/low/condition/wind/sunrise/sunset, plus that hour's reading if a time is given. `source` is `recorded` or `archive`. |
-| `GET /api/locations` | Locations being recorded. |
+| `GET /api/locations[?all=1]` | Locations being recorded (`all=1` also lists removed ones). |
+| `GET /api/search?q=` | Find a city by name or US ZIP code (Open-Meteo geocoding, Zippopotam.us). |
+| `POST /api/locations?name=&lat=&lon=` | Start recording a city. |
+| `POST /api/home?name=&lat=&lon=` | Move the server's Home location. |
 | `DELETE /api/locations?id=` | Stop recording a location (removing a tab in the app does this). Its history is kept. |
 | `GET /api/health` | Liveness check. |
 

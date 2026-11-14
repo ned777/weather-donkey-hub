@@ -34,13 +34,20 @@ API (all GET unless noted, all JSON):
       recording, and returns a snapshot in exactly the shape the app caches.
   /api/history?id=<loc id>&lat=<lat>&lon=<lon>&date=YYYY-MM-DD[&time=HH:MM]
       What the weather was on that day (and at that hour, if given).
-  /api/locations                     — every location being recorded
+  /api/locations[?all=1]             — locations being recorded (all=1: also removed ones)
+  /api/search?q=<city or US ZIP>     — find places to add
+  POST /api/locations?name=&lat=&lon= — start recording a city
+  POST /api/home?name=&lat=&lon=     — move the server's Home location
   DELETE /api/locations?id=<loc id>  — stop recording (history is kept)
+
+Recording: Home (the server's own location) plus every added city, hourly.
+The phone's "Current" (GPS) tab is shown live but never recorded.
 """
 import json
 import logging
 import math
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -69,6 +76,15 @@ RECORD_MINUTE = 2          # hourly recording runs at HH:02
 # MET Norway's terms require a User-Agent that identifies the app.
 USER_AGENT = "WeatherDonkeyHub/1.0 (+https://github.com/ned777/weather-donkey-hub)"
 
+# The server's own location — always recorded hourly, whatever the phone is doing.
+# Override with WEATHER_DONKEY_HOME="Name|lat|lon"; can also be changed from the web page.
+HOME_ID = "home"
+DEFAULT_HOME = os.environ.get("WEATHER_DONKEY_HOME", "Carson, CA|33.8317|-118.2817")
+# The phone's GPS tab. Shown live but never recorded (it moves when you travel).
+CURRENT_ID = "current"
+# History for a spot within this distance of a recorded location uses that location's recordings.
+NEARBY_KM = 10
+
 SOURCE_OPEN_METEO = "open-meteo"
 SOURCE_MET = "met-norway"
 SOURCE_LABELS = {SOURCE_OPEN_METEO: "Open-Meteo", SOURCE_MET: "MET Norway"}
@@ -92,6 +108,11 @@ def db():
 
 def init_db():
     os.makedirs(DATA_DIR, exist_ok=True)
+    _create_tables()
+    ensure_home()
+
+
+def _create_tables():
     with _db_lock, db() as conn:
         conn.executescript(
             """
@@ -136,6 +157,62 @@ def init_db():
         )
 
 
+def ensure_home():
+    """Makes sure the server's own Home location exists (adopting old "current" recordings)."""
+    now = int(time.time())
+    with _db_lock, db() as conn:
+        if conn.execute("SELECT 1 FROM locations WHERE id = ?", (HOME_ID,)).fetchone():
+            return
+        old = conn.execute("SELECT * FROM locations WHERE id = ?", (CURRENT_ID,)).fetchone()
+        if old:
+            conn.execute(
+                "INSERT INTO locations (id, name, lat, lon, tz, active, added_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+                (HOME_ID, old["name"] or "Home", old["lat"], old["lon"], old["tz"], old["added_at"], now))
+            for table in ("observations", "daily"):
+                conn.execute(f"UPDATE {table} SET location_id = ? WHERE location_id = ?", (HOME_ID, CURRENT_ID))
+            conn.execute("DELETE FROM locations WHERE id = ?", (CURRENT_ID,))
+            log.info("Home location created from the old 'current' recordings (%s)", old["name"])
+        else:
+            name, lat, lon = DEFAULT_HOME.split("|")
+            conn.execute(
+                "INSERT INTO locations (id, name, lat, lon, active, added_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 1, ?, ?)", (HOME_ID, name, float(lat), float(lon), now, now))
+            log.info("Home location set to %s", name)
+
+
+def set_home(name, lat, lon):
+    now = int(time.time())
+    with _db_lock, db() as conn:
+        conn.execute("UPDATE locations SET name = ?, lat = ?, lon = ?, tz = NULL, active = 1, updated_at = ? "
+                     "WHERE id = ?", (name, lat, lon, now, HOME_ID))
+
+
+def location_id_for(lat, lon):
+    # Same id format the app uses for its city tabs, so both sides agree.
+    return f"{lat:.4f},{lon:.4f}"
+
+
+def all_locations(include_inactive=False):
+    sql = "SELECT * FROM locations" + ("" if include_inactive else " WHERE active = 1")
+    with _db_lock, db() as conn:
+        rows = [dict(r) for r in conn.execute(sql)]
+    rows.sort(key=lambda r: (r["id"] != HOME_ID, r["added_at"]))
+    return rows
+
+
+def distance_km(lat1, lon1, lat2, lon2):
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = p2 - p1, math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 6371 * 2 * math.asin(math.sqrt(a))
+
+
+def nearest_locations(lat, lon, max_km):
+    found = [(distance_km(lat, lon, l["lat"], l["lon"]), l) for l in all_locations(include_inactive=True)]
+    return [l for d, l in sorted(found, key=lambda x: x[0]) if d <= max_km]
+
+
 def upsert_location(loc_id, name, lat, lon):
     now = int(time.time())
     with _db_lock, db() as conn:
@@ -164,8 +241,7 @@ def set_location_tz(loc_id, tz):
 
 
 def active_locations():
-    with _db_lock, db() as conn:
-        return [dict(r) for r in conn.execute("SELECT * FROM locations WHERE active = 1")]
+    return all_locations()
 
 
 def deactivate_location(loc_id):
@@ -204,6 +280,28 @@ def record(loc_id, lat, lon, data):
                  today["code"], today["wind_mph"], today["rain_pct"],
                  today["sunrise"], today["sunset"], now),
             )
+
+
+def health_stats():
+    with _db_lock, db() as conn:
+        obs = conn.execute("SELECT COUNT(*), MIN(hour_utc), MAX(recorded_at) FROM observations").fetchone()
+        days = conn.execute("SELECT COUNT(DISTINCT location_id || date) FROM daily").fetchone()[0]
+    size = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
+    now = datetime.now()
+    next_run = now.replace(minute=RECORD_MINUTE, second=0, microsecond=0)
+    if next_run <= now:
+        next_run += timedelta(hours=1)
+    return {
+        "ok": True,
+        "locations": len(active_locations()),
+        "hourly_records": obs[0],
+        "daily_records": days,
+        "recording_since": obs[1],
+        "last_recorded": obs[2],
+        "next_recording": int(next_run.timestamp()),
+        "db_bytes": size,
+        "retention_years": RETENTION_YEARS,
+    }
 
 
 def purge_old_records():
@@ -291,9 +389,10 @@ def local_iso_minute(dt):
 def fetch_open_meteo(lat, lon):
     params = {
         "latitude": lat, "longitude": lon,
-        "current": "temperature_2m,weather_code,is_day,wind_speed_10m",
+        "current": "temperature_2m,weather_code,is_day,wind_speed_10m,apparent_temperature,"
+                   "relative_humidity_2m,pressure_msl,wind_direction_10m,wind_gusts_10m,cloud_cover,uv_index",
         "daily": "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,"
-                 "wind_speed_10m_max,precipitation_probability_max",
+                 "wind_speed_10m_max,precipitation_probability_max,uv_index_max",
         "hourly": "temperature_2m,weather_code,is_day,wind_speed_10m,precipitation_probability",
         "forecast_days": FORECAST_DAYS + 1,
         "forecast_hours": HOURLY_COUNT + 2,
@@ -305,6 +404,16 @@ def fetch_open_meteo(lat, lon):
         "time": c["time"], "temp_f": float(c["temperature_2m"]),
         "code": int(c["weather_code"]), "is_day": c["is_day"] == 1,
         "wind_mph": float(c["wind_speed_10m"]),
+        "details": {
+            "feels_like_f": c.get("apparent_temperature"),
+            "humidity": c.get("relative_humidity_2m"),
+            "pressure_hpa": c.get("pressure_msl"),
+            "wind_dir": c.get("wind_direction_10m"),
+            "gust_mph": c.get("wind_gusts_10m"),
+            "cloud_pct": c.get("cloud_cover"),
+            "uv": c.get("uv_index"),
+            "uv_max": (d.get("uv_index_max") or [None])[0],
+        },
     }
     hourly = [
         {
@@ -401,6 +510,7 @@ def fetch_met(lat, lon, tz):
         n6 = e["data"].get("next_6_hours")
         symbol = ((n1 or n6 or {}).get("summary") or {}).get("symbol_code")
         entries.append({
+            "inst": inst,
             "t": t, "temp_f": c_to_f(inst["air_temperature"]),
             "wind_mph": ms_to_mph(inst.get("wind_speed", 0.0)),
             "symbol": symbol, "code": met_symbol_to_wmo(symbol),
@@ -417,6 +527,16 @@ def fetch_met(lat, lon, tz):
         "temp_f": cur["temp_f"], "code": cur["code"],
         "is_day": is_day_at(now_utc.astimezone(tz), cur["symbol"]),
         "wind_mph": cur["wind_mph"],
+        "details": {
+            "feels_like_f": None,
+            "humidity": cur["inst"].get("relative_humidity"),
+            "pressure_hpa": cur["inst"].get("air_pressure_at_sea_level"),
+            "wind_dir": cur["inst"].get("wind_from_direction"),
+            "gust_mph": ms_to_mph(cur["inst"]["wind_speed_of_gust"]) if "wind_speed_of_gust" in cur["inst"] else None,
+            "cloud_pct": cur["inst"].get("cloud_area_fraction"),
+            "uv": cur["inst"].get("ultraviolet_index_clear_sky"),
+            "uv_max": None,
+        },
     }
     hourly = [
         {"time": local_iso_minute(e["t"]), "temp_f": e["temp_f"], "code": e["code"],
@@ -455,13 +575,18 @@ def fetch_met(lat, lon, tz):
 _pool = ThreadPoolExecutor(max_workers=8)
 
 
-def fetch_and_record(loc_id, lat, lon):
+def fetch_and_record(loc_id, lat, lon, record_it=True):
     """
-    Fetches both sources in parallel, records whichever succeeded, and returns
-    (primary_data, statuses). primary_data is None only when BOTH failed.
+    Fetches both sources in parallel, records whichever succeeded (unless
+    record_it is False), and returns (primary_data, statuses). primary_data is
+    None only when BOTH failed.
     """
-    loc = get_location(loc_id)
-    tz = zone_for(loc and loc.get("tz"), lon)
+    loc = get_location(loc_id) if record_it else None
+    if loc is None:
+        near = nearest_locations(lat, lon, 300)  # just to borrow a real time zone
+        tz = zone_for(near[0].get("tz") if near else None, lon)
+    else:
+        tz = zone_for(loc.get("tz"), lon)
     om_future = _pool.submit(fetch_open_meteo, lat, lon)
     met_future = _pool.submit(fetch_met, lat, lon, tz)
     results, statuses = {}, {}
@@ -474,6 +599,9 @@ def fetch_and_record(loc_id, lat, lon):
             log.warning("%s failed for %s: %s: %s", source, loc_id, type(e).__name__, e)
 
     om = results.get(SOURCE_OPEN_METEO)
+    primary = om or results.get(SOURCE_MET)
+    if not record_it:
+        return primary, statuses
     if om and om["tz"] and (not loc or loc.get("tz") != om["tz"]):
         set_location_tz(loc_id, om["tz"])
     for data in results.values():
@@ -481,8 +609,6 @@ def fetch_and_record(loc_id, lat, lon):
             record(loc_id, lat, lon, data)
         except Exception:
             log.exception("Recording %s for %s failed", data["source"], loc_id)
-
-    primary = om or results.get(SOURCE_MET)
     return primary, statuses
 
 
@@ -510,6 +636,8 @@ def to_app_snapshot(data, name, notice, statuses):
         "city": name,
         "temp_f": cur["temp_f"], "code": cur["code"], "is_day": cur["is_day"],
         "wind_mph": cur["wind_mph"],
+        "details": cur.get("details") or {},
+        "local_time": cur["time"],  # "now" at that location, e.g. for the sun-position bar
         "sunrise": today["sunrise"] if today else "",
         "sunset": today["sunset"] if today else "",
         "today_high_f": today["high_f"] if today else cur["temp_f"],
@@ -534,16 +662,26 @@ def lookup_history(loc_id, lat, lon, day, hour):
     Returns a dict, or raises ValueError for a bad request.
     """
     loc = get_location(loc_id) if loc_id else None
-    tz = zone_for(loc and loc.get("tz"), lon)
+    nearby = [l for l in nearest_locations(lat, lon, NEARBY_KM) if l["id"] != loc_id]
+    tz_source = loc or (nearby[0] if nearby else None)
+    tz = zone_for(tz_source and tz_source.get("tz"), lon)
     today_there = datetime.now(tz).date()
     if day > today_there:
         raise ValueError("That date is in the future")
     if day == today_there and hour is not None and hour > datetime.now(tz).hour:
         raise ValueError("That time hasn't happened yet")
 
-    recorded = _history_from_records(loc_id, day, hour) if loc_id else None
-    if recorded:
-        return recorded
+    # 1) this location's own recordings, 2) a recorded location within NEARBY_KM
+    #    (e.g. the phone's Current tab while at home uses Home's recordings),
+    # 3) Open-Meteo's archive.
+    candidates = ([loc] if loc else []) + nearby
+    for cand in candidates:
+        recorded = _history_from_records(cand["id"], day, hour)
+        if recorded:
+            if cand["id"] != loc_id:
+                recorded["source_label"] = recorded["source_label"].replace(
+                    "Recorded by your server", f"Recorded by your server at {cand['name']}")
+            return recorded
     return _history_from_archive(lat, lon, day, hour)
 
 
@@ -623,6 +761,30 @@ def _history_from_archive(lat, lon, day, hour):
 
 
 # ---------------------------------------------------------------------------
+# Place search (for adding cities from the web page)
+# ---------------------------------------------------------------------------
+
+def search_places(query):
+    query = query.strip()
+    results = []
+    if re.fullmatch(r"\d{5}", query):  # US ZIP code
+        try:
+            j = http_get_json(f"https://api.zippopotam.us/us/{query}")
+            for p in j.get("places", []):
+                results.append({"name": f"{p['place name']}, {p['state abbreviation']} {query}",
+                                "lat": float(p["latitude"]), "lon": float(p["longitude"])})
+        except Exception as e:
+            log.info("ZIP lookup for %s failed: %s", query, e)
+    j = http_get_json("https://geocoding-api.open-meteo.com/v1/search?"
+                      + urlencode({"name": query, "count": 8, "language": "en", "format": "json"}))
+    for r in j.get("results", []) or []:
+        parts = [r.get("name"), r.get("admin1"), r.get("country")]
+        name = ", ".join(dict.fromkeys(p for p in parts if p))
+        results.append({"name": name, "lat": float(r["latitude"]), "lon": float(r["longitude"])})
+    return results[:10]
+
+
+# ---------------------------------------------------------------------------
 # Hourly recorder
 # ---------------------------------------------------------------------------
 
@@ -692,7 +854,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/health":
-                return self._send(200, {"ok": True, "locations": len(active_locations())})
+                return self._send(200, health_stats())
 
             if path == "/api/weather":
                 loc_id = p.get("id")
@@ -700,8 +862,13 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("id is required")
                 lat, lon = self._coords(p)
                 name = p.get("name") or None
-                upsert_location(loc_id, name, lat, lon)
-                data, statuses = fetch_and_record(loc_id, lat, lon)
+                record_it = loc_id != CURRENT_ID  # the phone's GPS tab is shown live, never recorded
+                if record_it and loc_id != HOME_ID:
+                    upsert_location(loc_id, name, lat, lon)
+                if loc_id == HOME_ID:
+                    home = get_location(HOME_ID)
+                    lat, lon, name = home["lat"], home["lon"], home["name"]
+                data, statuses = fetch_and_record(loc_id, lat, lon, record_it)
                 if data is None:
                     return self._send(503, {"error": "Both weather services are unavailable",
                                             "sources": statuses})
@@ -726,7 +893,13 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(404, {"error": str(e)})
 
             if path == "/api/locations":
-                return self._send(200, {"locations": active_locations()})
+                return self._send(200, {"locations": all_locations(include_inactive=p.get("all") == "1")})
+
+            if path == "/api/search":
+                q = (p.get("q") or "").strip()
+                if len(q) < 2:
+                    raise ValueError("Type at least 2 characters")
+                return self._send(200, {"results": search_places(q)})
 
             return self._send(404, {"error": "Not found"})
         except ValueError as e:
@@ -735,9 +908,30 @@ class Handler(BaseHTTPRequestHandler):
             log.exception("Request failed: %s", self.path)
             return self._send(502, {"error": f"Weather lookup failed ({type(e).__name__})"})
 
+    def do_POST(self):
+        path = urlparse(self.path).path
+        p = self._params()
+        try:
+            lat, lon = self._coords(p)
+            name = (p.get("name") or "").strip() or f"{lat:.2f}, {lon:.2f}"
+            if path == "/api/locations":
+                loc_id = location_id_for(lat, lon)
+                upsert_location(loc_id, name, lat, lon)
+                _pool.submit(fetch_and_record, loc_id, lat, lon)  # first recording right away
+                return self._send(200, {"location": get_location(loc_id)})
+            if path == "/api/home":
+                set_home(name, lat, lon)
+                _pool.submit(fetch_and_record, HOME_ID, lat, lon)
+                return self._send(200, {"location": get_location(HOME_ID)})
+            return self._send(404, {"error": "Not found"})
+        except ValueError as e:
+            return self._send(400, {"error": str(e)})
+
     def do_DELETE(self):
         path = urlparse(self.path).path
         p = self._params()
+        if path == "/api/locations" and p.get("id") == HOME_ID:
+            return self._send(400, {"error": "Home can't be removed — change it instead"})
         if path == "/api/locations" and p.get("id"):
             found = deactivate_location(p["id"])
             return self._send(200 if found else 404, {"ok": found})
