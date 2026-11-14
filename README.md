@@ -5,12 +5,17 @@ widget look and work the same as before, but they no longer talk to a weather
 service themselves. Everything goes through a small server on the home network
 that:
 
-- **Pulls from three free, keyless, worldwide sources.** It tries
-  [Open-Meteo](https://open-meteo.com) first, then [MET Norway](https://api.met.no),
-  then [7Timer!](https://www.7timer.info), which is built on NOAA's global model.
-  Any source that's down is skipped, and the app shows a small yellow note such
-  as *"Open-Meteo unavailable — showing MET Norway"*. The widget's status line
-  shortens it to *"· MET Norway"*. A request fails only if all three are down.
+- **Pulls from three free, keyless, worldwide sources** —
+  [Open-Meteo](https://open-meteo.com), [MET Norway](https://api.met.no) and
+  [7Timer!](https://www.7timer.info) (built on NOAA's global model) — all at once,
+  and **shows their average by default**: temperatures, wind and details are
+  averaged, rain chance is averaged over the sources that have one, and the
+  condition is whatever most sources agree on. Tap **Open-Meteo**, **MET Norway**
+  or **7Timer!** (on the web page or in the app) to see that source's own version
+  instead; the choice is remembered, and the widget follows the app's choice.
+  A source that's down is skipped with a small yellow note such as
+  *"Open-Meteo unavailable — averaging MET Norway & 7Timer!"*. A stuck connection
+  is dropped after 4 s and retried twice. A request fails only if all three are down.
 - **Records the weather every 2 hours for its own location only.** Home is where
   this computer is, and it's recorded from every source that answers into a local SQLite
   database. Saved cities and the phone's **Current** (GPS) tab show live
@@ -27,11 +32,12 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
                                                                   └─▶  Open-Meteo archive
 ```
 
-- **Has its own web page** at http://192.168.1.5:8094: a dashboard in the app's
-  style with current conditions (feels-like, humidity, wind direction and gusts,
+- **Has its own web page** at http://192.168.1.5:8094: a pure-black (AMOLED)
+  dashboard with current conditions (feels-like, humidity, wind direction and gusts,
   pressure, cloud cover, UV, and a daylight bar), the 12-hour and 5-day
-  forecasts, *What Was the Weather?*, the °F ⇄ °C converter, and location
-  management. You can save a city by name or US ZIP code to view it, remove a
+  forecasts, *What Was the Weather?*, **On This Day** (events, famous births and
+  deaths, and holidays — downloaded from Wikipedia once a year and served from
+  the server), the °F ⇄ °C converter, and location management. You can save a city by name or US ZIP code to view it, remove a
   city, or move Home if the server moves.
 - **Keeps the app and the web page in sync.** Cities added or removed on either
   one carry over to the other on the app's next pull-to-refresh.

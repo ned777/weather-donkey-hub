@@ -31,9 +31,47 @@ data class HourlyForecast(
     val condition: WeatherCondition get() = WeatherCondition.fromCodeAndWind(code, windSpeedMph)
 }
 
+/** The extra "Right Now" readings. Any of them can be missing (null) — not every source has them. */
+data class WeatherDetails(
+    val feelsLikeF: Double? = null,
+    val humidity: Double? = null,
+    val pressureHpa: Double? = null,
+    val windDir: Double? = null,
+    val gustMph: Double? = null,
+    val cloudPct: Double? = null,
+    val uv: Double? = null,
+    val uvMax: Double? = null
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("feels_like_f", feelsLikeF ?: JSONObject.NULL)
+        .put("humidity", humidity ?: JSONObject.NULL)
+        .put("pressure_hpa", pressureHpa ?: JSONObject.NULL)
+        .put("wind_dir", windDir ?: JSONObject.NULL)
+        .put("gust_mph", gustMph ?: JSONObject.NULL)
+        .put("cloud_pct", cloudPct ?: JSONObject.NULL)
+        .put("uv", uv ?: JSONObject.NULL)
+        .put("uv_max", uvMax ?: JSONObject.NULL)
+
+    companion object {
+        private fun JSONObject.num(key: String): Double? =
+            if (!has(key) || isNull(key)) null else optDouble(key).takeUnless { it.isNaN() }
+
+        fun fromJson(o: JSONObject?): WeatherDetails = if (o == null) WeatherDetails() else WeatherDetails(
+            feelsLikeF = o.num("feels_like_f"), humidity = o.num("humidity"),
+            pressureHpa = o.num("pressure_hpa"), windDir = o.num("wind_dir"),
+            gustMph = o.num("gust_mph"), cloudPct = o.num("cloud_pct"),
+            uv = o.num("uv"), uvMax = o.num("uv_max")
+        )
+    }
+}
+
 /**
  * One successful fetch's worth of weather data: today's current reading plus
  * the next 12 hours and the next 5 days, everything the widget/app need to render.
+ *
+ * The server sends the average of every weather source at the top level and each
+ * source's own version in [bySource] (keyed "open-meteo", "met-norway", "7timer"),
+ * so switching sources never needs another request. See [forSource].
  */
 data class WeatherSnapshot(
     val cityName: String?,
@@ -49,13 +87,32 @@ data class WeatherSnapshot(
     val hourly: List<HourlyForecast>, // next hour .. +12 hours, oldest first
     val forecast: List<DailyForecast>, // tomorrow .. +5 days, oldest first
     val fetchedAt: Long,
-    // Set by the server when one of its two weather sources was down, e.g.
-    // "Open-Meteo unavailable — showing MET Norway only". Null when both were fine.
-    val notice: String? = null
+    // Set by the server when a weather source was down, e.g.
+    // "Open-Meteo unavailable — averaging MET Norway & 7Timer!". Null when all were fine.
+    val notice: String? = null,
+    val details: WeatherDetails = WeatherDetails(),
+    val localTime: String = "",           // "now" at that place, e.g. "2026-11-14T10:52"
+    val source: String = "",              // "average", or one source's key
+    val sourceLabel: String = "",         // "Average of Open-Meteo, MET Norway, 7Timer!"
+    val sourceStatuses: Map<String, String> = emptyMap(), // key -> "ok" / "unavailable"
+    val sourceOrder: List<String> = emptyList(),
+    val sourceNames: Map<String, String> = emptyMap(),    // key -> "Open-Meteo"
+    val bySource: Map<String, WeatherSnapshot> = emptyMap()
 ) {
     val condition: WeatherCondition get() = WeatherCondition.fromCodeAndWind(code, windSpeedMph)
 
-    fun toJson(): String {
+    /** The version to show for [key]: one source's own forecast, or the average when that's
+     *  "average" or the source didn't answer this time. City name and fetch time carry over. */
+    fun forSource(key: String): WeatherSnapshot {
+        if (key == SourcePreference.AVERAGE) return this
+        val own = bySource[key] ?: return this
+        return own.copy(cityName = cityName, fetchedAt = fetchedAt, sourceStatuses = sourceStatuses,
+            sourceOrder = sourceOrder, sourceNames = sourceNames)
+    }
+
+    fun toJson(): String = toJsonObject().toString()
+
+    private fun toJsonObject(): JSONObject {
         val root = JSONObject()
         root.put("city", cityName ?: JSONObject.NULL)
         root.put("temp_f", tempF)
@@ -69,6 +126,18 @@ data class WeatherSnapshot(
         root.put("today_rain_pct", todayRainChancePercent)
         root.put("fetched_at", fetchedAt)
         root.put("notice", notice ?: JSONObject.NULL)
+        root.put("details", details.toJson())
+        root.put("local_time", localTime)
+        root.put("source", source)
+        root.put("source_label", sourceLabel)
+        root.put("sources", JSONObject(sourceStatuses as Map<*, *>))
+        root.put("source_order", JSONArray(sourceOrder))
+        root.put("source_labels", JSONObject(sourceNames as Map<*, *>))
+        if (bySource.isNotEmpty()) {
+            val by = JSONObject()
+            bySource.forEach { (k, v) -> by.put(k, v.toJsonObject()) }
+            root.put("by_source", by)
+        }
         val hourlyArray = JSONArray()
         hourly.forEach { hour ->
             hourlyArray.put(
@@ -95,12 +164,20 @@ data class WeatherSnapshot(
             )
         }
         root.put("forecast", forecastArray)
-        return root.toString()
+        return root
     }
 
     companion object {
         fun fromJson(json: String): WeatherSnapshot? = try {
-            val root = JSONObject(json)
+            fromJsonObject(JSONObject(json))
+        } catch (e: Exception) {
+            null
+        }
+
+        private fun stringMap(o: JSONObject?): Map<String, String> =
+            o?.keys()?.asSequence()?.associateWith { o.optString(it) } ?: emptyMap()
+
+        private fun fromJsonObject(root: JSONObject): WeatherSnapshot {
             // Snapshots cached before hourly existed have no "hourly" key — they just
             // show no hourly strip until the next refresh.
             val hourlyArray = root.optJSONArray("hourly") ?: JSONArray()
@@ -127,8 +204,10 @@ data class WeatherSnapshot(
                     rainChancePercent = day.optInt("rain_pct", 0)
                 )
             }
-            WeatherSnapshot(
-                cityName = root.optString("city", "").takeUnless { it.isEmpty() },
+            val by = root.optJSONObject("by_source")
+            val order = root.optJSONArray("source_order")
+            return WeatherSnapshot(
+                cityName = root.optString("city", "").takeUnless { root.isNull("city") || it.isEmpty() },
                 tempF = root.getDouble("temp_f"),
                 code = root.getInt("code"),
                 isDay = root.getBoolean("is_day"),
@@ -141,11 +220,31 @@ data class WeatherSnapshot(
                 hourly = hourly,
                 forecast = forecast,
                 fetchedAt = root.getLong("fetched_at"),
-                notice = root.optString("notice", "").takeUnless { root.isNull("notice") || it.isEmpty() }
+                notice = root.optString("notice", "").takeUnless { root.isNull("notice") || it.isEmpty() },
+                details = WeatherDetails.fromJson(root.optJSONObject("details")),
+                localTime = root.optString("local_time", ""),
+                source = root.optString("source", ""),
+                sourceLabel = root.optString("source_label", ""),
+                sourceStatuses = stringMap(root.optJSONObject("sources")),
+                sourceOrder = order?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList(),
+                sourceNames = stringMap(root.optJSONObject("source_labels")),
+                bySource = by?.keys()?.asSequence()?.associateWith { fromJsonObject(by.getJSONObject(it)) } ?: emptyMap()
             )
-        } catch (e: Exception) {
-            null
         }
+    }
+}
+
+/** Which forecast to show everywhere (app and widget): the average of all sources, or one source's own. */
+object SourcePreference {
+    const val AVERAGE = "average"
+    private const val PREFS_NAME = "weather"
+    private const val KEY = "weather_source"
+
+    fun get(context: Context): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY, AVERAGE) ?: AVERAGE
+
+    fun set(context: Context, key: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY, key).apply()
     }
 }
 

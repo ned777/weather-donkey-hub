@@ -63,7 +63,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
         private fun renderFromCache(context: Context, manager: AppWidgetManager, id: Int) {
             val locationId = WidgetLocationBinding.get(context, id)
             val needsPermission = locationId == WeatherCache.CURRENT_LOCATION_ID && !LocationHelper.hasPermission(context)
-            val snapshot = WeatherCache.read(context, locationId)
+            val snapshot = WeatherCache.read(context, locationId)?.forSource(SourcePreference.get(context))
             val statusText = when {
                 needsPermission -> context.getString(R.string.widget_need_permission)
                 snapshot != null -> statusFor(snapshot)
@@ -88,7 +88,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                     renderFromCache(context, manager, id)
                     return
                 }
-                val cached = WeatherCache.read(context, locationId)
+                val cached = WeatherCache.read(context, locationId)?.forSource(SourcePreference.get(context))
                 manager.updateAppWidget(id, buildViews(context, manager, id, locationId, cached, context.getString(R.string.widget_loading)))
 
                 val location = LocationHelper.getLocationBlocking(context)
@@ -109,7 +109,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                     renderFromCache(context, manager, id)
                     return
                 }
-                val cached = WeatherCache.read(context, locationId)
+                val cached = WeatherCache.read(context, locationId)?.forSource(SourcePreference.get(context))
                 manager.updateAppWidget(id, buildViews(context, manager, id, locationId, cached, context.getString(R.string.widget_loading)))
 
                 val outcome = WeatherClient.fetchWeather(locationId, saved.displayName, saved.lat, saved.lon)
@@ -127,7 +127,8 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                 is WeatherClient.Outcome.Ok -> {
                     val snapshot = outcome.value.copy(cityName = cityName ?: outcome.value.cityName)
                     WeatherCache.save(context, locationId, snapshot)
-                    manager.updateAppWidget(id, buildViews(context, manager, id, locationId, snapshot, statusFor(snapshot)))
+                    val shown = snapshot.forSource(SourcePreference.get(context))
+                    manager.updateAppWidget(id, buildViews(context, manager, id, locationId, shown, statusFor(snapshot)))
                 }
                 WeatherClient.Outcome.ServerUnreachable -> manager.updateAppWidget(id, buildViews(context, manager, id, locationId, cached,
                     statusWithFallback(context, cached, context.getString(R.string.widget_error_server))))

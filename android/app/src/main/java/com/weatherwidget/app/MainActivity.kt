@@ -17,7 +17,6 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
-import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -56,12 +55,14 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val SERVER_HOME_ID = "home"
-        private const val TEMP_MAX_SP = 200f
-        private const val TEMP_MIN_SP = 70f
+        private const val TEMP_MAX_SP = 104f
+        private const val TEMP_MIN_SP = 44f
 
-        // Matches tempText's negative side margins in activity_main.xml (which claw back
-        // most of the screen's 24dp content padding) — the small visible margin left over.
-        private const val TEMP_SIDE_MARGIN_DP = 8f
+        // Page side padding (12dp each side) + the card's inner padding (12dp each side) +
+        // the 8dp gap between the hero's two columns, from activity_main.xml.
+        private const val HERO_CHROME_DP = 56f
+        // The temperature's column takes 1.1 of the hero row's 2.1 total weight.
+        private const val TEMP_COLUMN_SHARE = 1.1f / 2.1f
     }
 
     // `lateinit var` is a promise to Kotlin: "this will definitely be set before
@@ -72,24 +73,34 @@ class MainActivity : AppCompatActivity() {
     // cover the brief moment before onCreate() has run.
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var tabLayout: TabLayout
-    private lateinit var fahrenheitButton: Button
-    private lateinit var celsiusButton: Button
+    private lateinit var fahrenheitButton: TextView
+    private lateinit var celsiusButton: TextView
     private lateinit var todayLabelText: TextView
     private lateinit var tempText: TextView
     private lateinit var todayHighLowText: TextView
-    private lateinit var todayRainText: TextView
-    private lateinit var todayWindText: TextView
+    private lateinit var feelsText: TextView
+    private lateinit var placeText: TextView
+    private lateinit var sourceChips: LinearLayout
+    private lateinit var sourceScroll: View
+    private lateinit var sourceLabelText: TextView
+    private lateinit var statsGrid: LinearLayout
+    private lateinit var dayLengthText: TextView
+    private lateinit var sunFill: View
+    private lateinit var sunRest: View
+    private lateinit var sunDot: View
+    private lateinit var hourlyCard: View
+    private lateinit var forecastCard: View
+    private lateinit var forecastMeta: TextView
+    private lateinit var historyChips: LinearLayout
     private lateinit var conditionIcon: ImageView
     private lateinit var conditionText: TextView
     private lateinit var sunriseText: TextView
     private lateinit var sunsetText: TextView
     private lateinit var updatedText: TextView
-    private lateinit var grantPermissionButton: Button
+    private lateinit var grantPermissionButton: TextView
     private lateinit var removeLocationButton: TextView
-    private lateinit var hourlyHeader: TextView
     private lateinit var hourlyScroll: View
     private lateinit var hourlyContainer: LinearLayout
-    private lateinit var forecastHeader: TextView
     private lateinit var forecastContainer: LinearLayout
     private lateinit var fahrenheitInput: EditText
     private lateinit var celsiusInput: EditText
@@ -97,7 +108,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var noticeText: TextView
     private lateinit var historyDateButton: TextView
     private lateinit var historyTimeButton: TextView
-    private lateinit var historyLookupButton: Button
+    private lateinit var historyLookupButton: TextView
     private lateinit var historyResult: View
     private lateinit var historyTitle: TextView
     private lateinit var historyIcon: ImageView
@@ -196,8 +207,20 @@ class MainActivity : AppCompatActivity() {
         todayLabelText = findViewById(R.id.todayLabelText)
         tempText = findViewById(R.id.tempText)
         todayHighLowText = findViewById(R.id.todayHighLowText)
-        todayRainText = findViewById(R.id.todayRainText)
-        todayWindText = findViewById(R.id.todayWindText)
+        feelsText = findViewById(R.id.feelsText)
+        placeText = findViewById(R.id.placeText)
+        sourceChips = findViewById(R.id.sourceChips)
+        sourceScroll = findViewById(R.id.sourceScroll)
+        sourceLabelText = findViewById(R.id.sourceLabelText)
+        statsGrid = findViewById(R.id.statsGrid)
+        dayLengthText = findViewById(R.id.dayLengthText)
+        sunFill = findViewById(R.id.sunFill)
+        sunRest = findViewById(R.id.sunRest)
+        sunDot = findViewById(R.id.sunDot)
+        hourlyCard = findViewById(R.id.hourlyCard)
+        forecastCard = findViewById(R.id.forecastCard)
+        forecastMeta = findViewById(R.id.forecastMeta)
+        historyChips = findViewById(R.id.historyChips)
         conditionIcon = findViewById(R.id.conditionIcon)
         conditionText = findViewById(R.id.conditionText)
         sunriseText = findViewById(R.id.sunriseText)
@@ -205,10 +228,8 @@ class MainActivity : AppCompatActivity() {
         updatedText = findViewById(R.id.updatedText)
         grantPermissionButton = findViewById(R.id.grantPermissionButton)
         removeLocationButton = findViewById(R.id.removeLocationButton)
-        hourlyHeader = findViewById(R.id.hourlyHeader)
         hourlyScroll = findViewById(R.id.hourlyScroll)
         hourlyContainer = findViewById(R.id.hourlyContainer)
-        forecastHeader = findViewById(R.id.forecastHeader)
         forecastContainer = findViewById(R.id.forecastContainer)
         fahrenheitInput = findViewById(R.id.fahrenheitInput)
         celsiusInput = findViewById(R.id.celsiusInput)
@@ -259,7 +280,8 @@ class MainActivity : AppCompatActivity() {
                 touchDownY = ev.rawY
                 horizontalGesture = false
                 gestureBlocksTabSwipe = isPointInsideView(ev.rawX, ev.rawY, converterSection) ||
-                    isPointInsideView(ev.rawX, ev.rawY, hourlyScroll)
+                    isPointInsideView(ev.rawX, ev.rawY, hourlyScroll) ||
+                    isPointInsideView(ev.rawX, ev.rawY, sourceScroll)
             }
             MotionEvent.ACTION_MOVE -> if (!horizontalGesture) {
                 val dx = abs(ev.rawX - touchDownX)
@@ -447,10 +469,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateUnitButtonsUi() {
         val fahrenheit = UnitPreference.isFahrenheit(this)
-        val activeColor = ContextCompat.getColor(this, R.color.retro_yellow)
-        val inactiveColor = ContextCompat.getColor(this, R.color.retro_white_dim)
-        fahrenheitButton.setTextColor(if (fahrenheit) activeColor else inactiveColor)
-        celsiusButton.setTextColor(if (!fahrenheit) activeColor else inactiveColor)
+        val onColor = ContextCompat.getColor(this, R.color.black)
+        val offColor = ContextCompat.getColor(this, R.color.app_dim)
+        listOf(fahrenheitButton to fahrenheit, celsiusButton to !fahrenheit).forEach { (button, on) ->
+            button.setTextColor(if (on) onColor else offColor)
+            button.setBackgroundResource(if (on) R.drawable.app_seg_on else 0)
+        }
     }
 
     private fun renderFromCache() {
@@ -460,19 +484,26 @@ class MainActivity : AppCompatActivity() {
         grantPermissionButton.visibility = if (isCurrentTab && !hasPermission) View.VISIBLE else View.GONE
         removeLocationButton.visibility = if (isCurrentTab) View.GONE else View.VISIBLE
 
-        val snapshot = WeatherCache.read(this, id)
-        if (snapshot != null) {
+        val full = WeatherCache.read(this, id)
+        if (full != null) {
+            val picked = SourcePreference.get(this)
+            val snapshot = full.forSource(picked)
+            renderSourceChips(full, picked)
             render(snapshot)
-            updatedText.text = WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt)
-            showNotice(snapshot.notice)
+            updatedText.text = "Updated " + WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt)
+            sourceLabelText.text = snapshot.sourceLabel
+            sourceLabelText.visibility = if (snapshot.sourceLabel.isEmpty()) View.GONE else View.VISIBLE
+            val pickedMissing = picked != SourcePreference.AVERAGE && full.bySource.isNotEmpty() && picked !in full.bySource
+            showNotice(if (pickedMissing) getString(R.string.source_unavailable, sourceName(full, picked)) else full.notice)
             if (snapshot.hourly.isEmpty()) fetchMissingHourlyOnce(id, isCurrentTab && !hasPermission)
         } else {
             clearWeatherFieldsToPlaceholder()
             showNotice(null)
-            hourlyHeader.visibility = View.GONE
-            hourlyScroll.visibility = View.GONE
+            sourceChips.removeAllViews()
+            sourceLabelText.visibility = View.GONE
+            hourlyCard.visibility = View.GONE
             hourlyContainer.removeAllViews()
-            forecastHeader.visibility = View.GONE
+            forecastCard.visibility = View.GONE
             forecastContainer.removeAllViews()
             updatedText.text = when {
                 isCurrentTab && !hasPermission -> getString(R.string.location_permission_rationale)
@@ -495,12 +526,15 @@ class MainActivity : AppCompatActivity() {
         applyTempTextSize("--°")
         tempText.text = "--°"
         todayHighLowText.text = "H:--°  L:--°"
-        todayRainText.text = "Rain: --%"
-        todayWindText.text = "Wind: --mph"
+        feelsText.text = ""
+        placeText.text = ""
         conditionIcon.setImageResource(R.drawable.ic_weather_cloudy)
         conditionText.text = "--"
-        sunriseText.text = "↑ Sunrise --:--"
-        sunsetText.text = "↓ Sunset --:--"
+        sunriseText.text = "↑ --:--"
+        sunsetText.text = "↓ --:--"
+        dayLengthText.text = ""
+        setSunProgress(null)
+        renderStats(null)
     }
 
     /**
@@ -633,6 +667,23 @@ class MainActivity : AppCompatActivity() {
             }.show()
         }
         historyLookupButton.setOnClickListener { lookUpHistory() }
+        val dp = resources.displayMetrics.density
+        listOf(1, 5, 10, 25).forEach { years ->
+            historyChips.addView(TextView(this).apply {
+                text = "$years yr ago"
+                textSize = 12f
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_dim))
+                setBackgroundResource(R.drawable.app_chip)
+                setPadding((10 * dp).toInt(), (4 * dp).toInt(), (10 * dp).toInt(), (4 * dp).toInt())
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                    .apply { marginEnd = (6 * dp).toInt() }
+                setOnClickListener {
+                    historyDate = LocalDate.now().minusYears(years.toLong())
+                    updateHistoryPickers()
+                    lookUpHistory()
+                }
+            })
+        }
     }
 
     private fun updateHistoryPickers() {
@@ -659,10 +710,12 @@ class MainActivity : AppCompatActivity() {
             ?: getString(R.string.current_location)
         showHistoryMessage(getString(R.string.history_looking))
         historyLookupButton.isEnabled = false
+        historyLookupButton.alpha = 0.5f
         Thread {
             val outcome = WeatherClient.lookupHistory(id, coords.first, coords.second, date, time)
             runOnUiThread {
                 historyLookupButton.isEnabled = true
+                historyLookupButton.alpha = 1f
                 when (outcome) {
                     is WeatherClient.Outcome.Ok -> renderHistory(outcome.value, placeName)
                     is WeatherClient.Outcome.Failed -> showHistoryMessage(outcome.message)
@@ -717,15 +770,182 @@ class MainActivity : AppCompatActivity() {
         applyTempTextSize(tempStr)
         tempText.text = tempStr
         todayHighLowText.text = WeatherFormat.highLowString(snapshot.todayHighF, snapshot.todayLowF, fahrenheit)
-        todayRainText.text = WeatherFormat.rainChanceString(snapshot.todayRainChancePercent)
-        todayWindText.text = WeatherFormat.windString(snapshot.windSpeedMph)
+        feelsText.text = snapshot.details.feelsLikeF?.let { "Feels like ${WeatherFormat.tempString(it, fahrenheit)}" } ?: ""
+        placeText.text = snapshot.cityName ?: savedLocations.find { it.id == activeLocationId }?.displayName ?: ""
         val condition = snapshot.condition
         conditionIcon.setImageResource(condition.iconRes(snapshot.isDay))
-        conditionText.text = condition.label
+        conditionText.text = if (condition == WeatherCondition.SUNNY && !snapshot.isDay) "Clear" else condition.label
+        renderStats(snapshot)
+        renderSun(snapshot)
+        populateHourly(snapshot.hourly, fahrenheit)
+        populateForecast(snapshot, fahrenheit)
+    }
+
+    // ---- source chips: Average / Open-Meteo / MET Norway / 7Timer! ----------------
+
+    private fun sourceName(full: WeatherSnapshot, key: String): String =
+        full.sourceNames[key] ?: full.bySource[key]?.sourceLabel ?: key
+
+    private fun renderSourceChips(full: WeatherSnapshot, picked: String) {
+        sourceChips.removeAllViews()
+        if (full.bySource.isEmpty()) {
+            sourceScroll.visibility = View.GONE // cached before the server sent every source
+            return
+        }
+        sourceScroll.visibility = View.VISIBLE
+        val fahrenheit = UnitPreference.isFahrenheit(this)
+        val active = if (picked in full.bySource) picked else SourcePreference.AVERAGE
+        val order = full.sourceOrder.ifEmpty { full.bySource.keys.toList() }
+        val chips = listOf(Triple(SourcePreference.AVERAGE, getString(R.string.source_average), full.tempF)) +
+            order.map { Triple(it, sourceName(full, it), full.bySource[it]?.tempF) }
+        chips.forEach { (key, name, temp) ->
+            sourceChips.addView(sourceChip(key, name, temp, fahrenheit, key == active, temp != null))
+        }
+    }
+
+    private fun sourceChip(key: String, name: String, tempF: Double?, fahrenheit: Boolean, active: Boolean, ok: Boolean): View {
+        val dp = resources.displayMetrics.density
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setBackgroundResource(if (active) R.drawable.app_chip_active else R.drawable.app_chip)
+            setPadding((11 * dp).toInt(), (5 * dp).toInt(), (11 * dp).toInt(), (5 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply { marginEnd = (6 * dp).toInt() }
+            alpha = if (ok) 1f else 0.6f
+        }
+        row.addView(View(this).apply {
+            setBackgroundResource(if (ok) R.drawable.app_dot_ok else R.drawable.app_dot_down)
+            layoutParams = LinearLayout.LayoutParams((7 * dp).toInt(), (7 * dp).toInt()).apply { marginEnd = (6 * dp).toInt() }
+        })
+        row.addView(TextView(this).apply {
+            text = name
+            textSize = 13f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, if (active) R.color.retro_cyan else R.color.app_dim))
+        })
+        if (tempF != null) row.addView(TextView(this).apply {
+            text = " " + WeatherFormat.tempString(tempF, fahrenheit)
+            textSize = 13f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.white))
+        })
+        if (ok) row.setOnClickListener {
+            SourcePreference.set(this, key)
+            renderFromCache()
+            WeatherWidgetProvider.repaintAllWidgets(this)
+        }
+        return row
+    }
+
+    // ---- details grid: 4 rows × 2 boxes, like the web page --------------------------
+
+    private fun renderStats(snapshot: WeatherSnapshot?) {
+        statsGrid.removeAllViews()
+        val fahrenheit = UnitPreference.isFahrenheit(this)
+        val d = snapshot?.details ?: WeatherDetails()
+        val dir = d.windDir
+        val boxes = listOf(
+            Triple("Rain chance", snapshot?.let { WeatherFormat.rainPct(it.todayRainChancePercent) } ?: "--", "today"),
+            Triple("Wind", snapshot?.let { WeatherFormat.mph(it.windSpeedMph) } ?: "--",
+                dir?.let { "from ${WeatherFormat.compass(it)} (${Math.round(it)}°)" } ?: ""),
+            Triple("Gusts", WeatherFormat.mph(d.gustMph), "max right now"),
+            Triple("Humidity", WeatherFormat.pct(d.humidity), "relative"),
+            Triple("Pressure", d.pressureHpa?.let { "${Math.round(it)} hPa" } ?: "--",
+                d.pressureHpa?.let { "%.2f inHg".format(it * 0.02953) } ?: ""),
+            Triple("Cloud cover", WeatherFormat.pct(d.cloudPct), "of the sky"),
+            Triple("UV index", d.uv?.let { "%.1f".format(it) } ?: "--", d.uvMax?.let { "max today %.1f".format(it) } ?: ""),
+            Triple("Feels like", d.feelsLikeF?.let { WeatherFormat.tempString(it, fahrenheit) } ?: "--", "apparent")
+        )
+        val dp = resources.displayMetrics.density
+        val lineColor = ContextCompat.getColor(this, R.color.app_line)
+        boxes.chunked(2).forEach { pair ->
+            statsGrid.addView(View(this).apply {
+                setBackgroundColor(lineColor)
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (1 * dp).toInt())
+            })
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            pair.forEachIndexed { i, (label, value, sub) ->
+                if (i == 1) row.addView(View(this).apply {
+                    setBackgroundColor(lineColor)
+                    layoutParams = LinearLayout.LayoutParams((1 * dp).toInt(), ViewGroup.LayoutParams.MATCH_PARENT)
+                })
+                row.addView(statBox(label, value, sub, label == "Wind" && dir != null, dir ?: 0.0))
+            }
+            statsGrid.addView(row)
+        }
+    }
+
+    private fun statBox(label: String, value: String, sub: String, arrow: Boolean, windFrom: Double): View {
+        val dp = resources.displayMetrics.density
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((12 * dp).toInt(), (7 * dp).toInt(), (10 * dp).toInt(), (7 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        box.addView(TextView(this).apply {
+            text = label.uppercase()
+            textSize = 10.5f
+            letterSpacing = 0.1f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_dim))
+        })
+        val valueRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        if (arrow) valueRow.addView(TextView(this).apply {
+            text = "↑"
+            textSize = 15f
+            rotation = (windFrom + 180).toFloat() // points where the wind is going
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.retro_teal))
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply { marginEnd = (5 * dp).toInt() }
+        })
+        valueRow.addView(TextView(this).apply {
+            text = value
+            textSize = 17f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.white))
+            maxLines = 1
+        })
+        box.addView(valueRow)
+        box.addView(TextView(this).apply {
+            text = sub
+            textSize = 11f
+            maxLines = 1
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_faint))
+        })
+        return box
+    }
+
+    // ---- sunrise / sunset bar --------------------------------------------------------
+
+    private fun renderSun(snapshot: WeatherSnapshot) {
         sunriseText.text = "↑ Sunrise ${WeatherFormat.clockTime(snapshot.sunrise)}"
         sunsetText.text = "↓ Sunset ${WeatherFormat.clockTime(snapshot.sunset)}"
-        populateHourly(snapshot.hourly, fahrenheit)
-        populateForecast(snapshot.forecast, fahrenheit)
+        val rise = WeatherFormat.minutesOf(snapshot.sunrise)
+        val set = WeatherFormat.minutesOf(snapshot.sunset)
+        if (rise == null || set == null || set <= rise) {
+            dayLengthText.text = ""
+            setSunProgress(null)
+            return
+        }
+        val len = set - rise
+        dayLengthText.text = "${len / 60}h ${len % 60}m of daylight"
+        val now = WeatherFormat.minutesOf(snapshot.localTime)
+            ?: java.time.LocalTime.now().let { it.hour * 60 + it.minute }
+        setSunProgress(((now - rise).toFloat() / len).coerceIn(0f, 1f), now in rise..set)
+    }
+
+    private fun setSunProgress(fraction: Float?, up: Boolean = true) {
+        val p = fraction ?: 0f
+        (sunFill.layoutParams as LinearLayout.LayoutParams).weight = p
+        (sunRest.layoutParams as LinearLayout.LayoutParams).weight = 1f - p
+        sunFill.requestLayout()
+        sunDot.visibility = if (fraction == null) View.INVISIBLE else View.VISIBLE
+        sunDot.alpha = if (up) 1f else 0.35f
+        if (p == 0f) (sunDot.layoutParams as LinearLayout.LayoutParams).marginStart = 0
+        else (sunDot.layoutParams as LinearLayout.LayoutParams).marginStart = (-6 * resources.displayMetrics.density).toInt()
     }
 
     // Measures the exact string against the screen's actual available width and picks the
@@ -739,10 +959,10 @@ class MainActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD
             textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, TEMP_MAX_SP, metrics)
         }
-        // tempText's negative side margins claw back most of the screen's padding — its
-        // real available width is the full screen minus just the small margin left over.
-        val availableWidthPx = metrics.widthPixels -
-            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, TEMP_SIDE_MARGIN_DP * 2, metrics)
+        // The temperature has the hero row's left column: its share of the screen width
+        // left after the page/card padding.
+        val availableWidthPx = (metrics.widthPixels -
+            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, HERO_CHROME_DP, metrics)) * TEMP_COLUMN_SHARE
         val measuredPx = paint.measureText(text)
         val fitSp = if (measuredPx > availableWidthPx && measuredPx > 0f) {
             (TEMP_MAX_SP * (availableWidthPx / measuredPx)).coerceAtLeast(TEMP_MIN_SP)
@@ -754,32 +974,51 @@ class MainActivity : AppCompatActivity() {
 
     private fun populateHourly(hourly: List<HourlyForecast>, fahrenheit: Boolean) {
         hourlyContainer.removeAllViews()
-        val visibility = if (hourly.isEmpty()) View.GONE else View.VISIBLE
-        hourlyHeader.visibility = visibility
-        hourlyScroll.visibility = visibility
+        hourlyCard.visibility = if (hourly.isEmpty()) View.GONE else View.VISIBLE
         val inflater = LayoutInflater.from(this)
-        hourly.forEach { hour ->
+        val dp = resources.displayMetrics.density
+        hourly.forEachIndexed { i, hour ->
             val cell = inflater.inflate(R.layout.item_forecast_hour, hourlyContainer, false)
             cell.findViewById<TextView>(R.id.hourLabel).text = WeatherFormat.clockTime(hour.time)
             cell.findViewById<ImageView>(R.id.conditionIcon).setImageResource(hour.condition.iconRes(hour.isDay))
             cell.findViewById<TextView>(R.id.tempText).text = WeatherFormat.tempString(hour.tempF, fahrenheit)
-            cell.findViewById<TextView>(R.id.rainText).text = WeatherFormat.rainChanceString(hour.rainChancePercent)
+            cell.findViewById<TextView>(R.id.rainText).text = WeatherFormat.rainPct(hour.rainChancePercent)
+            val rain = hour.rainChancePercent.coerceAtLeast(0)
+            cell.findViewById<View>(R.id.rainBar).layoutParams.height =
+                if (rain == 0) 0 else maxOf(2f, rain / 100f * 22f).times(dp).toInt()
+            if (i == hourly.lastIndex) cell.findViewById<View>(R.id.divider).visibility = View.GONE
             hourlyContainer.addView(cell)
         }
     }
 
-    private fun populateForecast(forecast: List<DailyForecast>, fahrenheit: Boolean) {
+    private fun populateForecast(snapshot: WeatherSnapshot, fahrenheit: Boolean) {
+        val forecast = snapshot.forecast
         forecastContainer.removeAllViews()
-        forecastHeader.visibility = if (forecast.isEmpty()) View.GONE else View.VISIBLE
+        forecastCard.visibility = if (forecast.isEmpty()) View.GONE else View.VISIBLE
+        if (forecast.isEmpty()) return
+        val lo = forecast.minOf { it.lowF }
+        val hi = forecast.maxOf { it.highF }
+        val span = maxOf(1.0, hi - lo)
+        forecastMeta.text = "${WeatherFormat.tempString(lo, fahrenheit)} – ${WeatherFormat.tempString(hi, fahrenheit)} this week"
+        val today = runCatching { LocalDate.parse(snapshot.localTime.take(10)) }.getOrElse { LocalDate.now() }
+        val dateFormat = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
         val inflater = LayoutInflater.from(this)
-        forecast.forEach { day ->
+        forecast.forEachIndexed { i, day ->
             val row = inflater.inflate(R.layout.item_forecast_day, forecastContainer, false)
             row.findViewById<TextView>(R.id.dayLabel).text = day.dateLabel.uppercase()
-            row.findViewById<TextView>(R.id.conditionText).text = day.condition.label
+            row.findViewById<TextView>(R.id.dateText).text = today.plusDays(i + 1L).format(dateFormat)
             row.findViewById<ImageView>(R.id.conditionIcon).setImageResource(day.condition.iconRes(isDay = true))
-            row.findViewById<TextView>(R.id.highLowText).text = WeatherFormat.highLowString(day.highF, day.lowF, fahrenheit)
-            row.findViewById<TextView>(R.id.rainText).text = WeatherFormat.rainChanceString(day.rainChancePercent)
-            row.findViewById<TextView>(R.id.windText).text = WeatherFormat.windString(day.windSpeedMph)
+            row.findViewById<TextView>(R.id.lowText).text = WeatherFormat.tempString(day.lowF, fahrenheit)
+            row.findViewById<TextView>(R.id.highText).text = WeatherFormat.tempString(day.highF, fahrenheit)
+            row.findViewById<TextView>(R.id.rainText).text = "☂ " + WeatherFormat.rainPct(day.rainChancePercent)
+            row.findViewById<TextView>(R.id.windText).text = WeatherFormat.mph(day.windSpeedMph)
+            val before = ((day.lowF - lo) / span).toFloat()
+            val width = maxOf(0.04f, ((day.highF - day.lowF) / span).toFloat())
+            (row.findViewById<View>(R.id.rangeBefore).layoutParams as LinearLayout.LayoutParams).weight = before
+            (row.findViewById<View>(R.id.rangeFill).layoutParams as LinearLayout.LayoutParams).weight = width
+            (row.findViewById<View>(R.id.rangeAfter).layoutParams as LinearLayout.LayoutParams).weight =
+                maxOf(0f, 1f - before - width)
+            if (i == forecast.lastIndex) row.findViewById<View>(R.id.divider).visibility = View.GONE
             forecastContainer.addView(row)
         }
     }

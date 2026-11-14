@@ -33,8 +33,27 @@ object WeatherFormat {
     /** -1 means "unknown" — MET Norway (the backup source) has no rain chance outside the Nordics. */
     fun rainChanceString(percent: Int): String = if (percent < 0) "Rain: --%" else "Rain: $percent%"
 
-    /** "Open-Meteo unavailable — showing MET Norway only" → "MET Norway only", for the tiny widget status line. */
-    fun shortNotice(notice: String): String = notice.substringAfter("showing ", notice)
+    /** For the tiny widget status line: "Open-Meteo unavailable — averaging …" → "Open-Meteo down",
+     *  "… — showing MET Norway" → "MET Norway only". */
+    fun shortNotice(notice: String): String = when {
+        "averaging" in notice -> notice.substringBefore(" unavailable") + " down"
+        "showing " in notice -> notice.substringAfter("showing ") + " only"
+        else -> notice
+    }
+
+    fun rainPct(percent: Int): String = if (percent < 0) "--%" else "$percent%"
+    fun pct(value: Double?): String = value?.let { "${Math.round(it)}%" } ?: "--"
+    fun mph(value: Double?): String = value?.let { "${Math.round(it)} mph" } ?: "--"
+
+    private val compass = arrayOf("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW")
+    fun compass(degrees: Double): String = compass[(Math.round(degrees / 22.5) % 16).toInt()]
+
+    /** Minutes after midnight of a local "yyyy-MM-ddTHH:mm" time, or null. */
+    fun minutesOf(iso: String): Int? = try {
+        LocalDateTime.parse(iso).let { it.hour * 60 + it.minute }
+    } catch (e: Exception) {
+        null
+    }
 
     // Wind speed (mph) rather than a percentage — there's no such thing as "wind
     // percentage" in the data Open-Meteo provides, so this reports the real number.

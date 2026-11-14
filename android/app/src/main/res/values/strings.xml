@@ -18,9 +18,15 @@
     <string name="current_location">Current Location</string>
     <string name="unit_fahrenheit">°F</string>
     <string name="unit_celsius">°C</string>
+    <string name="now_header">Right Now</string>
     <string name="hourly_header">Next 12 Hours</string>
+    <string name="hourly_meta">temperature · rain chance</string>
+    <string name="converter_meta">type in either box</string>
+    <string name="history_hint">Pick a date (and a time, or the whole day) and tap Look Up.</string>
+    <string name="source_average">Average</string>
+    <string name="source_unavailable">%1$s is unavailable right now — showing the average</string>
     <string name="forecast_header">5-Day Forecast</string>
-    <string name="converter_header">°F ⇄ °C Converter</string>
+    <string name="converter_header">°F ⇄ °C</string>
     <string name="widget_today_label">TODAY</string>
 
     <string name="tab_current">Current</string>
@@ -30,7 +36,7 @@
     <string name="cancel">Cancel</string>
     <string name="choose_location">Choose a location</string>
     <string name="no_location_matches">No matches for \"%1$s\"</string>
-    <string name="remove_location">✕ Remove This Location</string>
+    <string name="remove_location">✕ Remove</string>
     <string name="remove_location_confirm">Remove this location?</string>
     <string name="remove">Remove</string>
     <string name="choose_widget_location">Choose a location for this widget</string>
