@@ -21,7 +21,7 @@
     <color name="retro_white_dim">#8C8C99</color>
 
     <!-- The app screen's AMOLED card look (same palette as the web page). The widget keeps its own colors. -->
-    <color name="app_line">#4A4A62</color>
+    <color name="app_line">#70708C</color>
     <color name="app_edge">#1AFFD1</color>
     <color name="app_dim">#C4C4D4</color>
     <color name="app_faint">#9A9AB0</color>
