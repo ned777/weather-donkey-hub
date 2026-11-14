@@ -103,19 +103,27 @@
   .srcpick button:disabled i { background: #ff5f5f; }
 
   /* ---------- 5-day ---------- */
-  .day { display: grid; grid-template-columns: 44px 28px 70px 1fr 56px; align-items: center; gap: 10px;
+  .day { display: grid; grid-template-columns: 46px 30px 1fr; align-items: center; column-gap: 10px; row-gap: 7px;
     padding: 9px 16px; border-bottom: 1px solid var(--line); }
   .day:last-child { border-bottom: 0; }
-  .day .name { color: var(--teal); font-weight: 700; font-size: 13px; }
+  .day .name { color: var(--teal); font-weight: 700; font-size: 13.5px; }
   .day .name small { display: block; color: var(--faint); font-weight: 400; font-size: 10.5px; }
-  .day svg { width: 26px; height: 26px; }
-  .day .c { color: var(--yellow); font-weight: 700; font-size: 13px; }
-  .range { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 8px; font-size: 13px; }
-  .range .lo { color: var(--dim); text-align: right; }
-  .range .hi { font-weight: 700; }
-  .bar { position: relative; height: 5px; border-radius: 3px; background: var(--line); }
+  .day svg { width: 28px; height: 28px; }
+  .day .main { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 10px; min-width: 0; }
+  .day .c { color: var(--yellow); font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .range { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 8px; font-size: 13.5px; }
+  .range .lo { color: var(--cyan); text-align: right; font-weight: 700; }
+  .range .hi { color: var(--yellow); font-weight: 800; }
+  .bar { position: relative; height: 6px; border-radius: 3px; background: var(--line); }
   .bar span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, var(--cyan), var(--yellow)); }
-  .day .x { color: var(--dim); font-size: 11px; text-align: right; line-height: 1.35; }
+  .dx { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 5px; }
+  .dx span { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font-size: 11.5px; color: var(--dim); white-space: nowrap; }
+  .dx b { font-weight: 700; }
+  .dx .rain b { color: var(--cyan); } .dx .wind b { color: var(--teal); } .dx .feel b { color: #FF7EDB; }
+  .dx .sun b { color: var(--yellow); }
+  .dx .uv0 b { color: #2BFF9A; } .dx .uv1 b { color: var(--yellow); } .dx .uv2 b { color: #FF9A3D; } .dx .uv3 b { color: #FF4D6D; }
+  .srcs { grid-column: 2 / -1; font-size: 11px; color: var(--faint); }
+  .srcs b { color: var(--dim); font-weight: 600; } .srcs span { white-space: nowrap; }
 
   /* ---------- 12 hours ---------- */
   .hours-wrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: #70708C #000; }
@@ -244,7 +252,8 @@
     .stat:nth-child(2n) { border-right: 0; }
     .hform { grid-template-columns: 1fr 1fr; }
     .hres { grid-template-columns: 1fr; }
-    .day { grid-template-columns: 40px 26px 1fr 50px; }
+    .day { grid-template-columns: 42px 28px 1fr; }
+    .day .main { grid-template-columns: 1fr; }
     .day .c { display: none; }
     .otd { grid-template-columns: 1fr; }
     .otd > div { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -558,23 +567,39 @@ function renderWeather() {
   $("histMeta").textContent = active ? shortName(active) : "";
 }
 
+const uvLevel = u => u < 3 ? 0 : u < 6 ? 1 : u < 8 ? 2 : 3;
+const uvWord = u => ["low", "moderate", "high", "very high"][uvLevel(u)];
 function renderDays(s) {
   const days = s.forecast;
   const lo = Math.min(...days.map(d => d.low_f)), hi = Math.max(...days.map(d => d.high_f));
   const span = Math.max(1, hi - lo);
   const base = s.local_time ? new Date(s.local_time.slice(0, 10) + "T12:00:00") : new Date();
   $("daysMeta").textContent = `${deg(lo)} – ${deg(hi)} this week`;
+  // On the Average view, show what each source says for that day too.
+  const others = s === lastSnapshot ? Object.entries(lastSnapshot.by_source || {}) : [];
   $("days").innerHTML = days.map((d, i) => {
     const [l, k] = condition(d.code, d.wind_mph);
-    const date = new Date(base); date.setDate(base.getDate() + i + 1);
+    const date = d.date ? new Date(d.date + "T12:00:00") : (() => { const x = new Date(base); x.setDate(base.getDate() + i + 1); return x; })();
     const left = (d.low_f - lo) / span * 100, width = (d.high_f - d.low_f) / span * 100;
+    const chips = [];
+    const rain = [d.rain_pct >= 0 ? pct(d.rain_pct) : null, d.precip_in != null && d.precip_in > 0 ? `${d.precip_in.toFixed(2)} in` : null].filter(Boolean);
+    chips.push(`<span class="rain">☂ <b>${rain.length ? rain.join(" · ") : d.precip_in === 0 ? "dry" : "--%"}</b></span>`);
+    chips.push(`<span class="wind">💨 <b>${mph(d.wind_mph)}</b>${d.gust_mph != null ? ` · gusts ${Math.round(d.gust_mph)}` : ""}</span>`);
+    if (d.uv_max != null) chips.push(`<span class="uv${uvLevel(d.uv_max)}">UV <b>${d.uv_max.toFixed(0)}</b> ${uvWord(d.uv_max)}</span>`);
+    if (d.feels_hi_f != null) chips.push(`<span class="feel">feels <b>${deg(d.feels_lo_f)}–${deg(d.feels_hi_f)}</b></span>`);
+    const srcs = others.map(([key, snap]) => {
+      const o = (snap.forecast || []).find(f => f.date === d.date) || (snap.forecast || [])[i];
+      return o ? `<span>${SOURCE_NAMES[key] || key} <b>${deg(o.high_f)}/${deg(o.low_f)}</b></span>` : null;
+    }).filter(Boolean);
     return `<div class="day">
       <span class="name">${esc(d.label.toUpperCase())}<small>${date.toLocaleDateString([], { month: "short", day: "numeric" })}</small></span>
-      ${icon(k)}<span class="c">${l}</span>
-      <div class="range"><span class="lo">${deg(d.low_f)}</span>
-        <div class="bar"><span style="left:${left}%;width:${Math.max(width, 4)}%"></span></div>
-        <span class="hi">${deg(d.high_f)}</span></div>
-      <div class="x">☂ ${pct(d.rain_pct)}<br>${mph(d.wind_mph)}</div>
+      ${icon(k)}
+      <div class="main"><span class="c">${l}</span>
+        <div class="range"><span class="lo">${deg(d.low_f)}</span>
+          <div class="bar"><span style="left:${left}%;width:${Math.max(width, 4)}%"></span></div>
+          <span class="hi">${deg(d.high_f)}</span></div></div>
+      <div class="dx">${chips.join("")}</div>
+      ${srcs.length > 1 ? `<div class="srcs">${srcs.join(" · ")}</div>` : ""}
     </div>`;
   }).join("");
 }

@@ -406,11 +406,13 @@ def fetch_open_meteo(lat, lon):
         "current": "temperature_2m,weather_code,is_day,wind_speed_10m,apparent_temperature,"
                    "relative_humidity_2m,pressure_msl,wind_direction_10m,wind_gusts_10m,cloud_cover,uv_index",
         "daily": "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,"
-                 "wind_speed_10m_max,precipitation_probability_max,uv_index_max",
+                 "wind_speed_10m_max,precipitation_probability_max,uv_index_max,"
+                 "precipitation_sum,wind_gusts_10m_max,apparent_temperature_max,apparent_temperature_min",
         "hourly": "temperature_2m,weather_code,is_day,wind_speed_10m,precipitation_probability",
         "forecast_days": FORECAST_DAYS + 1,
         "forecast_hours": HOURLY_COUNT + 2,
-        "temperature_unit": "fahrenheit", "wind_speed_unit": "mph", "timezone": "auto",
+        "temperature_unit": "fahrenheit", "wind_speed_unit": "mph", "precipitation_unit": "inch",
+        "timezone": "auto",
     }
     j = http_get_json("https://api.open-meteo.com/v1/forecast?" + urlencode(params))
     c, d, h = j["current"], j["daily"], j["hourly"]
@@ -445,11 +447,21 @@ def fetch_open_meteo(lat, lon):
             "wind_mph": d["wind_speed_10m_max"][i],
             "rain_pct": _int_or(d["precipitation_probability_max"][i], -1),
             "sunrise": d["sunrise"][i], "sunset": d["sunset"][i],
+            "precip_in": _day_value(d, "precipitation_sum", i),
+            "gust_mph": _day_value(d, "wind_gusts_10m_max", i),
+            "uv_max": _day_value(d, "uv_index_max", i),
+            "feels_hi_f": _day_value(d, "apparent_temperature_max", i),
+            "feels_lo_f": _day_value(d, "apparent_temperature_min", i),
         }
         for i in range(len(d["time"]))
     ]
     return {"source": SOURCE_OPEN_METEO, "tz": j.get("timezone"),
             "current": current, "hourly": hourly, "days": days}
+
+
+def _day_value(daily, key, i):
+    values = daily.get(key) or []
+    return values[i] if i < len(values) else None
 
 
 def _int_or(value, default):
@@ -842,6 +854,8 @@ def average_sources(results):
             "code": _consensus_code([x["code"] for x in same]),
             "rain_pct": _mean_pct([x["rain_pct"] for x in same]),
             "sunrise": sun.get("sunrise", ""), "sunset": sun.get("sunset", ""),
+            **{k: _mean([x.get(k) for x in same], 2 if k == "precip_in" else 1)
+               for k in ("precip_in", "gust_mph", "uv_max", "feels_hi_f", "feels_lo_f")},
         })
     return {"source": SOURCE_AVERAGE, "tz": first.get("tz"),
             "current": current, "hourly": hourly, "days": days}
@@ -871,8 +885,12 @@ def to_app_snapshot(data, name, notice, statuses):
     for d in days[1:FORECAST_DAYS + 1]:
         forecast.append({
             "label": date.fromisoformat(d["date"]).strftime("%a"),
+            "date": d["date"],
             "high_f": d["high_f"], "low_f": d["low_f"], "code": d["code"],
             "wind_mph": d["wind_mph"], "rain_pct": d["rain_pct"],
+            "sunrise": d.get("sunrise", ""), "sunset": d.get("sunset", ""),
+            "precip_in": d.get("precip_in"), "gust_mph": d.get("gust_mph"), "uv_max": d.get("uv_max"),
+            "feels_hi_f": d.get("feels_hi_f"), "feels_lo_f": d.get("feels_lo_f"),
         })
     cur = data["current"]
     return {
