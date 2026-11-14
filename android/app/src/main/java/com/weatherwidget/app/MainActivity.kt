@@ -15,6 +15,8 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -127,6 +129,16 @@ class MainActivity : AppCompatActivity() {
     // starting anywhere else on the weather content does.
     private var gestureBlocksTabSwipe = false
 
+    // Sideways-vs-down gesture tracking, so a tab swipe never turns into a refresh.
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    private var horizontalGesture = false
+    private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
+
+    // Which way the content should slide in after a tab change (-1, 0, 1).
+    private var pendingSlide = 0
+    private lateinit var contentRoot: ViewGroup
+
     private val tabSwipeDetector by lazy {
         GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
@@ -135,7 +147,7 @@ class MainActivity : AppCompatActivity() {
                 val diffY = e2.y - e1.y
                 // Mostly horizontal, and a deliberate flick — not an incidental wobble
                 // during a vertical scroll or the SwipeRefreshLayout's own pull-down.
-                if (abs(diffX) <= abs(diffY)) return false
+                if (abs(diffX) <= abs(diffY) * 1.5f) return false
                 val metrics = resources.displayMetrics
                 val minDistancePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 60f, metrics)
                 val minVelocity = ViewConfiguration.get(this@MainActivity).scaledMinimumFlingVelocity
@@ -215,7 +227,11 @@ class MainActivity : AppCompatActivity() {
         historyMessage = findViewById(R.id.historyMessage)
         setupHistory()
 
+        contentRoot = findViewById(R.id.contentRoot)
         swipeRefresh.setColorSchemeColors(ContextCompat.getColor(this, R.color.retro_cyan))
+        // A refresh needs a deliberate pull (default is ~64dp), so small downward
+        // drift while swiping or scrolling doesn't set one off.
+        swipeRefresh.setDistanceToTriggerSync((140 * resources.displayMetrics.density).toInt())
         swipeRefresh.setOnRefreshListener { startRefresh() }
         setupTempConverter()
 
@@ -237,12 +253,45 @@ class MainActivity : AppCompatActivity() {
     // feed tabSwipeDetector's fling detection and to remember whether THIS gesture started
     // inside the converter or the hourly strip.
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.action == MotionEvent.ACTION_DOWN) {
-            gestureBlocksTabSwipe = isPointInsideView(ev.rawX, ev.rawY, converterSection) ||
-                isPointInsideView(ev.rawX, ev.rawY, hourlyScroll)
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                touchDownX = ev.rawX
+                touchDownY = ev.rawY
+                horizontalGesture = false
+                gestureBlocksTabSwipe = isPointInsideView(ev.rawX, ev.rawY, converterSection) ||
+                    isPointInsideView(ev.rawX, ev.rawY, hourlyScroll)
+            }
+            MotionEvent.ACTION_MOVE -> if (!horizontalGesture) {
+                val dx = abs(ev.rawX - touchDownX)
+                val dy = abs(ev.rawY - touchDownY)
+                // As soon as a gesture is clearly sideways, pull-to-refresh sits it out
+                // until the finger lifts, however much the finger drifts down.
+                if (dx > touchSlop && dx > dy) {
+                    horizontalGesture = true
+                    if (!swipeRefresh.isRefreshing) swipeRefresh.isEnabled = false
+                }
+            }
         }
         tabSwipeDetector.onTouchEvent(ev)
-        return super.dispatchTouchEvent(ev)
+        val handled = super.dispatchTouchEvent(ev)
+        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
+            swipeRefresh.isEnabled = true
+        }
+        return handled
+    }
+
+    /** Slides the weather content in from the side the user swiped toward (or just fades for a tap). */
+    private fun animateContentIn(direction: Int) {
+        val firstContent = contentRoot.indexOfChild(tabLayout) + 1
+        val offset = 60 * resources.displayMetrics.density * direction
+        for (i in firstContent until contentRoot.childCount) {
+            val child = contentRoot.getChildAt(i)
+            child.animate().cancel()
+            child.translationX = offset
+            child.alpha = 0f
+            child.animate().translationX(0f).alpha(1f).setDuration(220)
+                .setInterpolator(DecelerateInterpolator()).start()
+        }
     }
 
     private fun isPointInsideView(rawX: Float, rawY: Float, view: View): Boolean {
@@ -259,6 +308,7 @@ class MainActivity : AppCompatActivity() {
         if (lastRealIndex < 0) return
         val newIndex = (tabLayout.selectedTabPosition + delta).coerceIn(0, lastRealIndex)
         if (newIndex != tabLayout.selectedTabPosition) {
+            pendingSlide = delta
             tabLayout.getTabAt(newIndex)?.select()
         }
     }
@@ -277,9 +327,11 @@ class MainActivity : AppCompatActivity() {
                     rebuildTabs()
                     return
                 }
+                val switched = activeLocationId != tag
                 activeLocationId = tag
-                swipeRefresh.isRefreshing = false
                 renderFromCache()
+                if (switched) animateContentIn(pendingSlide)
+                pendingSlide = 0
             }
 
             override fun onTabUnselected(tab: TabLayout.Tab) {}
@@ -497,59 +549,59 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Pull-to-refresh updates EVERY tab at once — Current plus each saved city —
+     * with all requests to the server running in parallel. The spinner stops
+     * when they've all answered.
+     */
     private fun startRefresh() {
-        Thread { syncLocationsWithServer() }.start()
-        val id = activeLocationId
-        if (id == WeatherCache.CURRENT_LOCATION_ID) {
-            if (!LocationHelper.hasPermission(this)) {
-                swipeRefresh.isRefreshing = false
-                requestPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                return
-            }
-            swipeRefresh.isRefreshing = true
-            Thread {
-                val location = LocationHelper.getLocationBlocking(this)
-                if (location == null) {
-                    runOnUiThread {
-                        updatedText.text = getString(R.string.widget_error_no_location)
-                        swipeRefresh.isRefreshing = false
-                    }
-                    return@Thread
-                }
-                WeatherCache.saveCurrentCoords(this, location.latitude, location.longitude)
-                fetchAndSave(id, location.latitude, location.longitude, GeocodeHelper.cityName(this, location))
-            }.start()
-        } else {
-            val saved = savedLocations.find { it.id == id } ?: return
-            swipeRefresh.isRefreshing = true
-            Thread { fetchAndSave(id, saved.lat, saved.lon, saved.displayName) }.start()
+        val hasPermission = LocationHelper.hasPermission(this)
+        if (activeLocationId == WeatherCache.CURRENT_LOCATION_ID && !hasPermission) {
+            swipeRefresh.isRefreshing = false
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            return
         }
+        swipeRefresh.isRefreshing = true
+        Thread {
+            syncLocationsWithServer() // picks up cities added/removed on the web page first
+            val errors = java.util.concurrent.ConcurrentHashMap<String, String>()
+            val workers = mutableListOf<Thread>()
+            if (hasPermission) {
+                workers += Thread {
+                    val location = LocationHelper.getLocationBlocking(this)
+                    if (location == null) {
+                        errors[WeatherCache.CURRENT_LOCATION_ID] = getString(R.string.widget_error_no_location)
+                    } else {
+                        WeatherCache.saveCurrentCoords(this, location.latitude, location.longitude)
+                        fetchOne(WeatherCache.CURRENT_LOCATION_ID, location.latitude, location.longitude,
+                            GeocodeHelper.cityName(this, location))?.let { errors[WeatherCache.CURRENT_LOCATION_ID] = it }
+                    }
+                }
+            }
+            LocationStore.list(this).forEach { loc ->
+                workers += Thread { fetchOne(loc.id, loc.lat, loc.lon, loc.displayName)?.let { errors[loc.id] = it } }
+            }
+            workers.forEach { it.start() }
+            workers.forEach { it.join() }
+            runOnUiThread {
+                swipeRefresh.isRefreshing = false
+                renderFromCache()
+                errors[activeLocationId]?.let { updatedText.text = it }
+                WeatherWidgetProvider.repaintAllWidgets(this)
+            }
+        }.start()
     }
 
-    // Runs on a background thread (called from startRefresh's Thread above). resolveCityName
-    // is a lambda rather than a plain value so the (possibly blocking) reverse-geocode call
-    // for the current-location tab only happens after the network fetch itself succeeds.
-    /** Runs on a background thread. The server does the actual weather fetching (and recording). */
-    private fun fetchAndSave(locationId: String, lat: Double, lon: Double, cityName: String?) {
-        val snapshot = when (val outcome = WeatherClient.fetchWeather(locationId, cityName, lat, lon)) {
-            is WeatherClient.Outcome.Ok -> outcome.value.copy(cityName = cityName ?: outcome.value.cityName)
-            else -> {
-                val message = (outcome as? WeatherClient.Outcome.Failed)?.message
-                    ?: getString(R.string.app_error_server)
-                runOnUiThread {
-                    if (activeLocationId == locationId) updatedText.text = message
-                    swipeRefresh.isRefreshing = false
-                }
-                return
+    /** Fetches one location from the server and caches it. Returns an error message, or null on success. */
+    private fun fetchOne(locationId: String, lat: Double, lon: Double, cityName: String?): String? =
+        when (val outcome = WeatherClient.fetchWeather(locationId, cityName, lat, lon)) {
+            is WeatherClient.Outcome.Ok -> {
+                WeatherCache.save(this, locationId, outcome.value.copy(cityName = cityName ?: outcome.value.cityName))
+                null
             }
+            is WeatherClient.Outcome.Failed -> outcome.message
+            WeatherClient.Outcome.ServerUnreachable -> getString(R.string.app_error_server)
         }
-        WeatherCache.save(this, locationId, snapshot)
-        runOnUiThread {
-            swipeRefresh.isRefreshing = false
-            if (activeLocationId == locationId) renderFromCache()
-            WeatherWidgetProvider.repaintAllWidgets(this)
-        }
-    }
 
     private fun showNotice(notice: String?) {
         noticeText.text = notice.orEmpty()
