@@ -21,8 +21,11 @@ The phone never talks to the weather services directly anymore — it only
 talks to this server, on the home network.
 
 Run:  python3 server.py
-Serves JSON on 0.0.0.0:8094 (override with WEATHER_DONKEY_PORT). Data lives
+Serves the web page (web/index.html) and JSON on 0.0.0.0:8094 (override with WEATHER_DONKEY_PORT). Data lives
 in ./data/weather.db next to this file (override with WEATHER_DONKEY_DATA).
+
+Web page:  /  — current weather per location, "What Was the Weather?"
+lookups, and the °F/°C converter, in the same look as the app.
 
 API (all GET unless noted, all JSON):
   /api/health
@@ -54,6 +57,7 @@ DATA_DIR = os.environ.get(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"),
 )
 DB_PATH = os.path.join(DATA_DIR, "weather.db")
+WEB_PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "index.html")
 
 RETENTION_YEARS = 10
 HOURLY_COUNT = 12          # the app's "Next 12 Hours" strip
@@ -676,6 +680,17 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         p = self._params()
         try:
+            if path in ("/", "/index.html"):
+                with open(WEB_PAGE, "rb") as f:
+                    body = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
             if path == "/api/health":
                 return self._send(200, {"ok": True, "locations": len(active_locations())})
 

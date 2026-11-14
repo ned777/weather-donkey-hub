@@ -24,6 +24,10 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
                                                                   └─▶  Open-Meteo archive
 ```
 
+- **Has its own web page** at http://192.168.1.5:8094, in the same look as the app.
+  It shows current weather for each location, the 12-hour and 5-day forecasts,
+  the *What Was the Weather?* lookup and the °F ⇄ °C converter.
+
 The server is home-network only. Away from home Wi‑Fi, the app and widget keep
 showing the last weather they loaded, with *"Can't reach Weather Donkey server
 (home Wi‑Fi only)"*.
@@ -41,6 +45,7 @@ showing the last weather they loaded, with *"Can't reach Weather Donkey server
 ```
 server/
   server.py                   — the whole server: stdlib Python only, nothing to pip install
+  web/index.html              — the web page the server shows at /
   weather-donkey-hub.service  — systemd user unit
 android/                      — the app + widget (installs over the original Weather Donkey)
 ```
@@ -56,7 +61,7 @@ Environment overrides: `WEATHER_DONKEY_PORT`, `WEATHER_DONKEY_DATA`.
 As a service that starts at boot (user services need `loginctl enable-linger`):
 
 ```sh
-mkdir -p ~/WeatherDonkeyHub && cp server/server.py ~/WeatherDonkeyHub/
+mkdir -p ~/WeatherDonkeyHub && cp -r server/server.py server/web ~/WeatherDonkeyHub/
 cp server/weather-donkey-hub.service ~/.config/systemd/user/
 systemctl --user daemon-reload && systemctl --user enable --now weather-donkey-hub
 sudo ufw allow from 192.168.1.0/24 to any port 8094 proto tcp
