@@ -369,7 +369,7 @@
       </div>
     </section>
   </div>
-  <footer>Weather from Open-Meteo, MET Norway &amp; 7Timer! · history from your server's recordings and the Open-Meteo archive · On This Day from Wikipedia</footer>
+  <footer>Weather from Open-Meteo, MET Norway &amp; 7Timer! · history from your server's recordings and the Open-Meteo archive · On This Day from Wikipedia, saved on the server and refreshed yearly</footer>
 </div>
 
 <script>
@@ -741,7 +741,7 @@ function otdLink(item, cls, inner) {
 }
 const yr = y => y < 0 ? `${-y} BC` : y;
 function person(p) {
-  const img = ext(p.thumb) ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : `<span class="ph"></span>`;
+  const img = /^\/otd-img\/[0-9a-f]+\.\w+$/.test(p.thumb || "") ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : `<span class="ph"></span>`;
   const [name, ...rest] = p.text.split(", ");
   return otdLink(p, "person", `${img}<div><span class="t"><b>${esc(name)}</b></span>
     <small><span class="y">${yr(p.year)}</span> · ${esc(rest.join(", ") || p.about || "")}</small></div>`);
@@ -767,7 +767,7 @@ async function loadOtd() {
     const r = await api(`/api/onthisday?month=${m}&day=${d}`);
     if (r.month === otdDay.getMonth() + 1 && r.day === otdDay.getDate()) renderOtd(r);
   } catch (e) {
-    $("otdEvents").textContent = "Couldn't reach Wikipedia right now.";
+    $("otdEvents").textContent = "This day isn't saved yet — try again in a bit.";
     $("otdBirths").innerHTML = $("otdDeaths").innerHTML = "";
   }
 }

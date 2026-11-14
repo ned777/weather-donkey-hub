@@ -44,6 +44,7 @@ Recording: ONLY Home (the server's own location), every 2 hours. Saved cities an
 phone's "Current" (GPS) tab are shown live and never recorded; their history
 comes from the Open-Meteo archive (or Home's recordings when within 10 km).
 """
+import hashlib
 import json
 import logging
 import math
@@ -910,18 +911,50 @@ def search_places(query):
 # On this day in history (Wikipedia's free, keyless feed)
 # ---------------------------------------------------------------------------
 
-_onthisday_cache = {}      # "MM-DD" -> (fetched_at, payload)
-_onthisday_lock = threading.Lock()
-ONTHISDAY_TTL_S = 12 * 3600
+# Everything is downloaded once a year into data/onthisday/ (text + small photos),
+# so the page never waits on Wikipedia. A day that somehow isn't saved yet is
+# fetched the first time it's asked for and then kept.
+OTD_DIR = os.path.join(DATA_DIR, "onthisday")
+OTD_FILE = os.path.join(OTD_DIR, "days.json")
+OTD_IMG_DIR = os.path.join(OTD_DIR, "img")
+OTD_THUMB_PX = 120
+_otd = {"year": 0, "days": {}}
+_otd_lock = threading.Lock()
 
 
-def _otd_item(e):
+def _otd_item(e, with_photo=False):
     pages = e.get("pages") or []
     page = pages[0] if pages else {}
-    thumb = (page.get("thumbnail") or {}).get("source")
     link = ((page.get("content_urls") or {}).get("desktop") or {}).get("page")
-    return {"year": e.get("year"), "text": e.get("text", ""), "link": link, "thumb": thumb,
-            "about": page.get("description")}
+    thumb = (page.get("thumbnail") or {}).get("source") if with_photo else None
+    return {"year": e.get("year"), "text": e.get("text", ""), "link": link,
+            "thumb": _save_photo(thumb) if thumb else None, "about": page.get("description")}
+
+
+def _save_photo(url):
+    """Download a small copy of a Wikipedia photo; returns the local URL, or None."""
+    url = url.split("?")[0]
+    small = re.sub(r"/\d+px-", f"/{OTD_THUMB_PX}px-", url)
+    ext = os.path.splitext(small)[1].lower()
+    ext = ext if ext in (".jpg", ".jpeg", ".png", ".gif", ".webp") else ".jpg"
+    name = hashlib.sha1(url.encode()).hexdigest()[:20] + ext
+    path = os.path.join(OTD_IMG_DIR, name)
+    if not os.path.exists(path):
+        for candidate in dict.fromkeys((small, url)):
+            try:
+                req = Request(candidate, headers={"User-Agent": USER_AGENT})
+                with urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
+                    body = resp.read()
+                os.makedirs(OTD_IMG_DIR, exist_ok=True)
+                with open(path + ".tmp", "wb") as f:
+                    f.write(body)
+                os.replace(path + ".tmp", path)
+                break
+            except Exception:
+                continue
+        else:
+            return None
+    return "/otd-img/" + name
 
 
 def _article_lengths(titles):
@@ -948,21 +981,16 @@ def _otd_people(items, count):
     rows = [(e, (e.get("pages") or [{}])[0].get("title")) for e in items if e.get("year") is not None]
     sizes = _article_lengths([t for _, t in rows if t])
     rows.sort(key=lambda r: sizes.get(r[1], 0), reverse=True)
-    people = [_otd_item(e) for e, _ in rows[:count]]
+    people = [_otd_item(e, with_photo=True) for e, _ in rows[:count]]
     people.sort(key=lambda p: p["year"])
     return people
 
 
-def on_this_day(month, day):
-    key = f"{month:02d}-{day:02d}"
-    with _onthisday_lock:
-        hit = _onthisday_cache.get(key)
-        if hit and time.time() - hit[0] < ONTHISDAY_TTL_S:
-            return hit[1]
+def _download_day(month, day):
     j = http_get_json(f"https://en.wikipedia.org/api/rest_v1/feed/onthisday/all/{month:02d}/{day:02d}")
     events = [_otd_item(e) for e in (j.get("selected") or j.get("events") or [])]
     events.sort(key=lambda e: e["year"] or 0, reverse=True)
-    payload = {
+    return {
         "month": month, "day": day,
         "events": events[:12],
         "births": _otd_people(j.get("births") or [], 10),
@@ -970,11 +998,79 @@ def on_this_day(month, day):
         "holidays": [h.get("text", "") for h in (j.get("holidays") or [])][:6],
         "source": "Wikipedia",
     }
-    with _onthisday_lock:
-        _onthisday_cache[key] = (time.time(), payload)
-        if len(_onthisday_cache) > 40:
-            _onthisday_cache.pop(next(iter(_onthisday_cache)))
+
+
+def _otd_load():
+    try:
+        with open(OTD_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        with _otd_lock:
+            _otd.update(year=data.get("year", 0), days=data.get("days", {}))
+    except FileNotFoundError:
+        pass
+    except Exception:
+        log.exception("Couldn't read %s", OTD_FILE)
+
+
+def _otd_save(year, days):
+    os.makedirs(OTD_DIR, exist_ok=True)
+    with open(OTD_FILE + ".tmp", "w", encoding="utf-8") as f:
+        json.dump({"year": year, "saved_at": int(time.time()), "days": days}, f)
+    os.replace(OTD_FILE + ".tmp", OTD_FILE)
+
+
+def on_this_day(month, day):
+    key = f"{month:02d}-{day:02d}"
+    with _otd_lock:
+        hit = _otd["days"].get(key)
+    if hit:
+        return hit
+    payload = _download_day(month, day)  # not saved yet — fetch once and keep it
+    with _otd_lock:
+        _otd["days"][key] = payload
+        year, days = _otd["year"], dict(_otd["days"])
+    _otd_save(year, days)
     return payload
+
+
+def onthisday_loop():
+    """Downloads all 366 days once per calendar year, politely and in the background."""
+    _otd_load()
+    while True:
+        this_year = date.today().year
+        with _otd_lock:
+            stale = _otd["year"] != this_year
+            have = set() if stale else set(_otd["days"])
+            days = {} if stale else dict(_otd["days"])
+        todo = [d for d in (date(2024, 1, 1) + timedelta(n) for n in range(366))
+                if d.strftime("%m-%d") not in have]
+        if todo:
+            log.info("On This Day: downloading %d days for %d", len(todo), this_year)
+            for i, d in enumerate(todo, 1):
+                key = d.strftime("%m-%d")
+                try:
+                    days[key] = _download_day(d.month, d.day)
+                except Exception as e:
+                    log.warning("On This Day %s failed: %s", key, e)
+                if i % 10 == 0 or i == len(todo):
+                    with _otd_lock:
+                        # keep serving last year's copy until this year's is complete
+                        if len(days) >= 366 or not stale:
+                            _otd.update(year=this_year, days=dict(days))
+                    if len(days) >= 366 or not stale:
+                        _otd_save(this_year, days)
+                time.sleep(1)
+            if len(days) >= 366:
+                log.info("On This Day: %d is saved (%d days)", this_year, len(days))
+                used = {p["thumb"].rsplit("/", 1)[1] for v in days.values()
+                        for p in v["births"] + v["deaths"] if p.get("thumb")}
+                for name in os.listdir(OTD_IMG_DIR) if os.path.isdir(OTD_IMG_DIR) else []:
+                    if name not in used:
+                        os.remove(os.path.join(OTD_IMG_DIR, name))  # last year's leftovers
+                continue
+            time.sleep(3600)  # some days failed — try those again in an hour
+            continue
+        time.sleep(6 * 3600)  # nothing to do until the year changes
 
 
 # ---------------------------------------------------------------------------
@@ -1082,6 +1178,22 @@ class Handler(BaseHTTPRequestHandler):
                 except LookupError as e:
                     return self._send(404, {"error": str(e)})
 
+            if path.startswith("/otd-img/"):
+                name = os.path.basename(path)
+                full = os.path.join(OTD_IMG_DIR, name)
+                if not re.fullmatch(r"[0-9a-f]{20}\.(jpg|jpeg|png|gif|webp)", name) or not os.path.exists(full):
+                    return self._send(404, {"error": "Not found"})
+                with open(full, "rb") as f:
+                    body = f.read()
+                ctype = {"png": "image/png", "gif": "image/gif", "webp": "image/webp"}.get(name.rsplit(".", 1)[1], "image/jpeg")
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "max-age=2592000")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
             if path == "/api/onthisday":
                 try:
                     month, day = int(p.get("month", "")), int(p.get("day", ""))
@@ -1138,6 +1250,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     init_db()
     threading.Thread(target=recorder_loop, name="recorder", daemon=True).start()
+    threading.Thread(target=onthisday_loop, name="onthisday", daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     log.info("Weather Donkey Hub on :%d, data in %s", PORT, DB_PATH)
     server.serve_forever()
