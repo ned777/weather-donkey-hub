@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Layout: city name centered at the very top (white), then a true 2x2 grid
+  of four equal-sized, equally-spaced quadrants — current temp + today's
+  high/low (top-left), "TODAY" / condition / sunrise-sunset (top-right),
+  and the next two days' forecast (bottom-left/right, each showing day/
+  high-low/condition, no icon by request). topRow and forecastRow share
+  weight="1" so the two halves are exactly equal in height, and every cell
+  carries a matching 4dp+4dp margin against its neighbor so the horizontal
+  gap between columns equals the vertical gap between rows — no visible
+  divider line, just equal, symmetric spacing on both axes. Every row below
+  cityText is toggled visible/gone in code (WeatherWidgetProvider —
+  buildViews()) based on the widget's current on-screen size. All text is set
+  in code; nothing here ever changes except through that.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/weatherWidgetRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background_r26_inset"
+    android:paddingTop="24dp"
+    android:paddingBottom="16dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
+
+    <!-- City name, centered, white — max 10 chars (see WeatherWidgetProvider.widgetCityLabel()). -->
+    <TextView
+        android:id="@+id/cityText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:textColor="@color/retro_white"
+        android:textStyle="bold"
+        android:letterSpacing="0.04"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="16sp"
+        android:text="@string/current_location" />
+
+    <!-- baselineAligned="false" — otherwise Android vertically aligns this row's two
+         columns by their FIRST line's text baseline, which visually shoves the "TODAY"
+         column upward relative to the much-larger temperature number next to it.
+         Same weight="1" as forecastRow below, so the current-weather/TODAY row and the
+         two-day-forecast row split the remaining vertical space into equal halves. -->
+    <LinearLayout
+        android:id="@+id/topRow"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:baselineAligned="false"
+        android:layout_marginTop="2dp">
+
+        <!-- Top-left: big current temperature, today's high/low right under it. Centered,
+             matching the forecast cells below — pinning this to the outer edge while the
+             forecast cells center is what made the top and bottom halves look mismatched
+             even with identical margins, since the empty space landed in different spots. -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="4dp"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tempText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_cyan"
+                android:textSize="52sp"
+                android:textStyle="bold"
+                android:text="--°" />
+
+            <TextView
+                android:id="@+id/todayHighLowText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="H:--°  L:--°" />
+
+        </LinearLayout>
+
+        <!-- Top-right: "TODAY" label, then condition, then sunrise/sunset — one line each, no
+             gap. Centered, matching the forecast cells and the top-left column. -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginStart="4dp"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/todayLabelText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_teal"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.04"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/widget_today_label" />
+
+            <!-- No includeFontPadding="false" here — condition words like "Sunny"/"Windy"/
+                 "Rainy" have real descenders, and stripping font padding was clipping them. -->
+            <TextView
+                android:id="@+id/conditionText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-3dp"
+                android:textColor="@color/retro_yellow"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="--" />
+
+            <!-- Sunrise and sunset each get their own line — not a side-by-side row. -->
+            <LinearLayout
+                android:id="@+id/sunRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/sunriseText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/retro_white"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:text="↑ --:--" />
+
+                <TextView
+                    android:id="@+id/sunsetText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="-3dp"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/retro_white"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:text="↓ --:--" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Bottom half: the next two days, high/low. -->
+    <LinearLayout
+        android:id="@+id/forecastRow"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="4dp"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/forecast1Day"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_teal"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:text="--" />
+
+            <TextView
+                android:id="@+id/forecast1HighLow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textSize="13sp"
+                android:text="--°/--°" />
+
+            <!-- Condition word underneath, no icon. No includeFontPadding="false" —
+                 see conditionText above for why (descender clipping). -->
+            <TextView
+                android:id="@+id/forecast1Condition"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-3dp"
+                android:textColor="@color/retro_yellow"
+                android:textSize="13sp"
+                android:text="--" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginStart="4dp"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/forecast2Day"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_teal"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:text="--" />
+
+            <TextView
+                android:id="@+id/forecast2HighLow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textSize="13sp"
+                android:text="--°/--°" />
+
+            <!-- Condition word underneath, no icon. No includeFontPadding="false" —
+                 see conditionText above for why (descender clipping). -->
+            <TextView
+                android:id="@+id/forecast2Condition"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-3dp"
+                android:textColor="@color/retro_yellow"
+                android:textSize="13sp"
+                android:text="--" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Status line: "Updating…" mid-refresh, a permission/error prompt, or (once loaded)
+         the last-updated time/date/timezone — always showing something, never blank. -->
+    <TextView
+        android:id="@+id/updatedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:includeFontPadding="false"
+        android:gravity="center"
+        android:textColor="@color/retro_white_dim"
+        android:textSize="10sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="" />
+
+</LinearLayout>

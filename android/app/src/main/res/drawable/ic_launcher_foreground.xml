@@ -1,0 +1,58 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Weather Donkey mascot: a blocky, flat-design donkey, side profile facing right.
+         Built only from rectangles/triangles/circles (same primitives as the ic_weather_*
+         condition icons) — big ears are the one exaggerated feature that reads as "donkey"
+         at a glance, everything else stays simple and geometric. -->
+
+    <!-- Scaled to 60% around the mascot's own bounding-box center so it sits smaller
+         and centered against the adaptive-icon background. -->
+    <group
+        android:pivotX="58.5"
+        android:pivotY="48.5"
+        android:scaleX="0.6"
+        android:scaleY="0.6">
+        <!-- Tail + tuft. -->
+        <path android:fillColor="#00E0B8" android:pathData="M20,50 L26,50 L26,64 L20,64 Z" />
+        <path android:fillColor="#00E0B8" android:pathData="M23,66 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+
+        <!-- Body. -->
+        <path android:fillColor="#00D9FF" android:pathData="M28,46 L74,46 L74,68 L28,68 Z" />
+
+        <!-- Legs. -->
+        <path android:fillColor="#00E0B8" android:pathData="M32,68 L38,68 L38,90 L32,90 Z" />
+        <path android:fillColor="#00E0B8" android:pathData="M44,68 L50,68 L50,90 L44,90 Z" />
+        <path android:fillColor="#00E0B8" android:pathData="M54,68 L60,68 L60,90 L54,90 Z" />
+        <path android:fillColor="#00E0B8" android:pathData="M66,68 L72,68 L72,90 L66,90 Z" />
+        <!-- Hooves. -->
+        <path android:fillColor="#F5F5FF" android:pathData="M32,87 L38,87 L38,90 L32,90 Z" />
+        <path android:fillColor="#F5F5FF" android:pathData="M44,87 L50,87 L50,90 L44,90 Z" />
+        <path android:fillColor="#F5F5FF" android:pathData="M54,87 L60,87 L60,90 L54,90 Z" />
+        <path android:fillColor="#F5F5FF" android:pathData="M66,87 L72,87 L72,90 L66,90 Z" />
+
+        <!-- Head + snout. -->
+        <path android:fillColor="#00D9FF" android:pathData="M66,34 L90,34 L90,54 L66,54 Z" />
+        <path android:fillColor="#00D9FF" android:pathData="M84,44 L98,44 L98,54 L84,54 Z" />
+        <!-- Pale muzzle patch around the nose — the classic donkey tell. -->
+        <path android:fillColor="#F5F5FF" android:pathData="M92,45 L98,45 L98,53 L92,53 Z" />
+
+        <!-- Ears — long, blunt-rounded ovals angled outward (not pointed, so this reads
+             as a donkey/horse ear rather than a wolf's). Each ear is a straight-sided
+             shaft with a circular cap overlaid to round off its tip. -->
+        <path android:fillColor="#00E0B8" android:pathData="M68,34 L63,14 L70,13 L76,33 Z" />
+        <path android:fillColor="#00E0B8" android:pathData="M66.5,13.5 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+        <path android:fillColor="#00E0B8" android:pathData="M88,34 L93,14 L86,13 L80,33 Z" />
+        <path android:fillColor="#00E0B8" android:pathData="M89.5,13.5 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+
+        <!-- Mane, between the ears and down the neck. -->
+        <path android:fillColor="#00E0B8" android:pathData="M68,30 L72,30 L72,36 L68,36 Z" />
+        <path android:fillColor="#00E0B8" android:pathData="M75,30 L79,30 L79,36 L75,36 Z" />
+
+        <!-- Eye + nostril. -->
+        <path android:fillColor="#C2185B" android:pathData="M80,42 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" />
+        <path android:fillColor="#C2185B" android:pathData="M95,49 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    </group>
+</vector>

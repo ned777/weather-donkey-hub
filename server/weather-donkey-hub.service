@@ -1,0 +1,14 @@
+[Unit]
+Description=Weather Donkey Hub (weather server + 10-year recorder)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/WeatherDonkeyHub
+ExecStart=/usr/bin/python3 %h/WeatherDonkeyHub/server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
