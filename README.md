@@ -38,9 +38,10 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
   server's own recordings. Anywhere else, including saved cities and wherever
   your phone is, they use the archive.
 
-The server is home-network only. Away from home Wi‑Fi, the app and widget keep
-showing the last weather they loaded, with *"Can't reach Weather Donkey server
-(home Wi‑Fi only)"*.
+The server listens on the home network only. The app and widget read
+everything from it, on home Wi‑Fi or away from home through a VPN into the
+home network. With no route home, they keep showing the last weather they
+loaded, with *"Server unreachable"*.
 
 ## Screenshots
 
@@ -120,7 +121,10 @@ HTTP is allowed only to that one address (`res/xml/network_security_config.xml`)
 
 The app keeps everything the original had: location tabs, pull-to-refresh, the
 outlined temperature, °F/°C, the 12-hour strip, the 5-day forecast, the converter
-and per-widget locations. It adds a **What Was the Weather?** section: pick a
+and per-widget locations. One pull-to-refresh now updates **every tab at once**
+(in parallel, all through the server), sideways swipes never trigger a refresh,
+and tabs slide in when you swipe between them. The server's Home isn't shown as
+an app tab, since it would duplicate Current. It adds a **What Was the Weather?** section: pick a
 date and either a time or "Whole day", tap **Look Up**, and it shows the answer
 for whichever tab is open.
 
