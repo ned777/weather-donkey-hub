@@ -71,8 +71,8 @@ WEB_PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "inde
 RETENTION_YEARS = 10
 HOURLY_COUNT = 12          # the app's "Next 12 Hours" strip
 FORECAST_DAYS = 5          # the app's "5-Day Forecast" list (after today)
-HTTP_TIMEOUT_S = 8
-RETRY_DELAYS_S = (1.5,)    # one retry per source; both sources run in parallel
+HTTP_TIMEOUT_S = 4         # a stuck connection is dropped after 4 s…
+RETRY_DELAYS_S = (0.5, 1.5)  # …and tried again twice; all sources run in parallel
 RECORD_EVERY_HOURS = 2     # Home is recorded every 2 hours (00:02, 02:02, …)
 RECORD_MINUTE = 2
 
@@ -697,9 +697,9 @@ _pool = ThreadPoolExecutor(max_workers=8)
 
 def fetch_and_record(loc_id, lat, lon, record_it=True):
     """
-    Fetches both sources in parallel, records whichever succeeded (unless
-    record_it is False), and returns (primary_data, statuses). primary_data is
-    None only when BOTH failed.
+    Fetches every source in parallel, records whichever succeeded (unless
+    record_it is False), and returns ({source: data}, statuses). The dict is
+    empty only when every source failed.
     """
     loc = get_location(loc_id) if record_it else None
     if loc is None:
@@ -721,9 +721,8 @@ def fetch_and_record(loc_id, lat, lon, record_it=True):
             statuses[source] = "unavailable"
             log.warning("%s failed for %s: %s: %s", source, loc_id, type(e).__name__, e)
 
-    primary = next((results[s] for s in SOURCE_PRIORITY if s in results), None)
     if not record_it:
-        return primary, statuses
+        return results, statuses
     learned_tz = results[SOURCE_OPEN_METEO]["tz"] if SOURCE_OPEN_METEO in results else None
     if learned_tz and (not loc or loc.get("tz") != learned_tz):
         set_location_tz(loc_id, learned_tz)
@@ -732,15 +731,136 @@ def fetch_and_record(loc_id, lat, lon, record_it=True):
             record(loc_id, lat, lon, data)
         except Exception:
             log.exception("Recording %s for %s failed", data["source"], loc_id)
-    return primary, statuses
+    return results, statuses
 
 
-def notice_for(statuses, primary_source):
-    """e.g. "Open-Meteo unavailable — showing MET Norway". None when nothing is down."""
+def notice_for(statuses, shown):
+    """e.g. "Open-Meteo unavailable — averaging MET Norway & 7Timer!". None when nothing is down."""
     down = [SOURCE_LABELS[s] for s in SOURCE_PRIORITY if statuses.get(s) == "unavailable"]
-    if not down or not primary_source:
+    if not down or not shown:
         return None
-    return f"{' & '.join(down)} unavailable — showing {SOURCE_LABELS[primary_source]}"
+    if len(shown) == 1:
+        return f"{' & '.join(down)} unavailable — showing {SOURCE_LABELS[shown[0]]}"
+    return f"{' & '.join(down)} unavailable — averaging {' & '.join(SOURCE_LABELS[s] for s in shown)}"
+
+
+# ---------------------------------------------------------------------------
+# Averaging the sources
+# ---------------------------------------------------------------------------
+
+SOURCE_AVERAGE = "average"
+_RAIN_CODES = {51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99}
+_SNOW_CODES = {71, 73, 75, 77, 85, 86}
+
+
+def _sky(code):
+    """The same condition buckets the app and page draw icons for (wind aside)."""
+    if code in _RAIN_CODES:
+        return "rain"
+    if code in _SNOW_CODES:
+        return "snow"
+    return {0: "sunny", 1: "sunny", 2: "partial"}.get(code, "cloudy")
+
+
+def _consensus_code(codes):
+    """Codes listed in source-priority order. The condition most sources agree on wins
+    (a tie goes to the higher-priority source), using that source's exact code."""
+    codes = [c for c in codes if c is not None]
+    if not codes:
+        return 3
+    votes = {}
+    for c in codes:
+        votes[_sky(c)] = votes.get(_sky(c), 0) + 1
+    best = max(votes.values())
+    return next(c for c in codes if votes[_sky(c)] == best)
+
+
+def _mean(values, digits=1):
+    values = [v for v in values if v is not None]
+    return round(sum(values) / len(values), digits) if values else None
+
+
+def _mean_pct(values):
+    known = [v for v in values if v is not None and v >= 0]
+    return round(sum(known) / len(known)) if known else -1
+
+
+def _mean_direction(values):
+    values = [v for v in values if v is not None]
+    if not values:
+        return None
+    x = sum(math.cos(math.radians(v)) for v in values)
+    y = sum(math.sin(math.radians(v)) for v in values)
+    return round(math.degrees(math.atan2(y, x)) % 360)
+
+
+def average_sources(results):
+    """One forecast made from every source that answered: temperatures, wind and
+    details are averaged, rain chance is averaged over the sources that have one,
+    and the condition is whatever most sources agree on."""
+    srcs = [results[s] for s in SOURCE_PRIORITY if s in results]
+    if not srcs:
+        return None
+    first = srcs[0]
+    curs = [d["current"] for d in srcs]
+    details = {}
+    for key in ("feels_like_f", "humidity", "pressure_hpa", "gust_mph", "cloud_pct", "uv", "uv_max"):
+        details[key] = _mean([(c.get("details") or {}).get(key) for c in curs])
+    details["wind_dir"] = _mean_direction([(c.get("details") or {}).get("wind_dir") for c in curs])
+    current = {
+        "time": first["current"]["time"], "is_day": first["current"]["is_day"],
+        "temp_f": _mean([c["temp_f"] for c in curs]),
+        "wind_mph": _mean([c["wind_mph"] for c in curs]),
+        "code": _consensus_code([c["code"] for c in curs]),
+        "details": details,
+    }
+
+    base = max(srcs, key=lambda d: len(d["hourly"]))  # the source with the fullest 12 hours
+    by_time = [{h["time"]: h for h in d["hourly"]} for d in srcs]
+    hourly = []
+    for h in base["hourly"]:
+        same = [m[h["time"]] for m in by_time if h["time"] in m]
+        hourly.append({
+            "time": h["time"], "is_day": h["is_day"],
+            "temp_f": _mean([x["temp_f"] for x in same]),
+            "wind_mph": _mean([x["wind_mph"] for x in same]),
+            "code": _consensus_code([x["code"] for x in same]),
+            "rain_pct": _mean_pct([x["rain_pct"] for x in same]),
+        })
+
+    by_date = [{x["date"]: x for x in d["days"]} for d in srcs]
+    dates = sorted({x for m in by_date for x in m})[:FORECAST_DAYS + 1]
+    days = []
+    for dt in dates:
+        same = [m[dt] for m in by_date if dt in m]
+        sun = next((x for x in same if x.get("sunrise")), same[0])
+        days.append({
+            "date": dt,
+            "high_f": _mean([x["high_f"] for x in same]),
+            "low_f": _mean([x["low_f"] for x in same]),
+            "wind_mph": _mean([x["wind_mph"] for x in same]),
+            "code": _consensus_code([x["code"] for x in same]),
+            "rain_pct": _mean_pct([x["rain_pct"] for x in same]),
+            "sunrise": sun.get("sunrise", ""), "sunset": sun.get("sunset", ""),
+        })
+    return {"source": SOURCE_AVERAGE, "tz": first.get("tz"),
+            "current": current, "hourly": hourly, "days": days}
+
+
+def weather_response(results, statuses, name):
+    """The averaged snapshot, plus every source's own snapshot under "by_source"
+    so the page and app can switch between them without asking again."""
+    shown = [s for s in SOURCE_PRIORITY if s in results]
+    out = to_app_snapshot(average_sources(results), name, notice_for(statuses, shown), statuses)
+    out["source_label"] = "Average of " + ", ".join(SOURCE_LABELS[s] for s in shown)
+    out["by_source"] = {}
+    for s in shown:
+        snap = to_app_snapshot(results[s], name, None, statuses)
+        snap["source_label"] = SOURCE_LABELS[s]
+        out["by_source"][s] = snap
+    out["source_order"] = list(SOURCE_PRIORITY)
+    out["source_labels"] = SOURCE_LABELS
+    return out
 
 
 def to_app_snapshot(data, name, notice, statuses):
@@ -1154,11 +1274,11 @@ class Handler(BaseHTTPRequestHandler):
                 if record_it:
                     home = get_location(HOME_ID)
                     lat, lon, name = home["lat"], home["lon"], home["name"]
-                data, statuses = fetch_and_record(loc_id, lat, lon, record_it)
-                if data is None:
+                results, statuses = fetch_and_record(loc_id, lat, lon, record_it)
+                if not results:
                     return self._send(503, {"error": "All weather services are unavailable",
                                             "sources": statuses})
-                return self._send(200, to_app_snapshot(data, name, notice_for(statuses, data["source"]), statuses))
+                return self._send(200, weather_response(results, statuses, name))
 
             if path == "/api/history":
                 lat, lon = self._coords(p)

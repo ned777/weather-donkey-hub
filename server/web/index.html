@@ -91,6 +91,17 @@
     padding: 4px 12px; cursor: pointer; }
   .refresh:hover { color: var(--white); border-color: var(--dim); }
 
+  /* ---------- source picker ---------- */
+  .srcpick { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .srcpick button { background: #000; border: 1px solid var(--line); color: var(--dim); border-radius: 999px;
+    padding: 4px 12px; font-weight: 700; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .srcpick button i { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); display: inline-block; }
+  .srcpick button b { color: var(--white); font-weight: 700; }
+  .srcpick button:hover:not(:disabled) { border-color: var(--teal); color: var(--white); }
+  .srcpick button.active { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan) inset; }
+  .srcpick button:disabled { cursor: default; opacity: .6; }
+  .srcpick button:disabled i { background: #ff5f5f; }
+
   /* ---------- 5-day ---------- */
   .day { display: grid; grid-template-columns: 44px 28px 70px 1fr 56px; align-items: center; gap: 10px;
     padding: 9px 16px; border-bottom: 1px solid var(--line); }
@@ -256,6 +267,7 @@
     <!-- NOW -->
     <section class="card c-now">
       <div class="card-head"><h2>Right Now</h2><span class="meta" id="nowMeta"></span></div>
+      <div class="srcpick" id="srcpick" role="group" aria-label="Weather source"></div>
       <div class="hero">
         <div class="left">
           <div class="today">TODAY</div>
@@ -407,6 +419,10 @@ const ago = ts => { const m = Math.round((Date.now() / 1000 - ts) / 60); return 
 
 const SOURCE_NAMES = { "open-meteo": "Open-Meteo", "met-norway": "MET Norway", "7timer": "7Timer!" };
 let locations = [], active = null, lastSnapshot = null, lastHistory = null;
+// Which forecast to show: "average" (all sources combined) or one source's own version.
+let sourceSel = "average";
+try { sourceSel = localStorage.getItem("wd-source") || "average"; } catch (e) {}
+const view = () => (sourceSel !== "average" && lastSnapshot?.by_source?.[sourceSel]) || lastSnapshot;
 
 async function api(path, method = "GET") {
   const res = await fetch(path, { method });
@@ -468,9 +484,27 @@ function stat(lbl, value, sub = "") {
   return `<div class="stat"><div class="label">${lbl}</div><div class="v">${value}</div><div class="s">${sub}</div></div>`;
 }
 
+function renderSourcePicker() {
+  const all = lastSnapshot;
+  const order = all.source_order || Object.keys(all.sources || {});
+  const btn = (key, text, temp, ok) =>
+    `<button data-src="${key}" class="${(view() === all ? "average" : sourceSel) === key ? "active" : ""}"
+      ${ok ? "" : "disabled title=\"Unavailable right now\""}><i></i>${esc(text)}${temp != null ? ` <b>${deg(temp)}</b>` : ""}</button>`;
+  $("srcpick").innerHTML = btn("average", "Average", all.temp_f, true) + order.map(k => {
+    const own = all.by_source?.[k];
+    return btn(k, SOURCE_NAMES[k] || k, own?.temp_f, !!own);
+  }).join("");
+  $("srcpick").querySelectorAll("button").forEach(b => b.onclick = () => {
+    sourceSel = b.dataset.src;
+    try { localStorage.setItem("wd-source", sourceSel); } catch (e) {}
+    renderWeather();
+  });
+}
+
 function renderWeather() {
-  const s = lastSnapshot;
-  if (!s) return;
+  if (!lastSnapshot) return;
+  const s = view();
+  renderSourcePicker();
   const d = s.details || {};
   const [l, key] = condition(s.code, s.wind_mph);
   $("temp").textContent = deg(s.temp_f);
@@ -512,10 +546,12 @@ function renderWeather() {
   const rec = active?.id === "home"
     ? '<span class="pill"><i></i>Recorded every 2 h</span>'
     : '<span class="pill" title="Only Home is recorded; history for this city comes from the archive"><i style="background:#9A9AB0"></i>Live only</span>';
-  $("pills").innerHTML = rec + " " + Object.entries(s.sources || {}).map(([k, v]) =>
-    `<span class="pill ${v === "ok" ? "" : "down"}" title="${v}"><i></i>${SOURCE_NAMES[k] || k}</span>`).join(" ");
-  $("notice").hidden = !s.notice;
-  $("notice").textContent = s.notice || "";
+  $("pills").innerHTML = rec + ` <span class="pill" title="Where these numbers come from"><i style="background:var(--cyan)"></i>${esc(s.source_label || "")}</span>`;
+  const picked = sourceSel !== "average" && s === lastSnapshot
+    ? `${SOURCE_NAMES[sourceSel] || sourceSel} is unavailable right now — showing the average` : null;
+  const notice = picked || lastSnapshot.notice;
+  $("notice").hidden = !notice;
+  $("notice").textContent = notice || "";
 
   renderDays(s);
   renderHours(s);
