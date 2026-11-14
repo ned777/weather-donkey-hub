@@ -907,6 +907,77 @@ def search_places(query):
 
 
 # ---------------------------------------------------------------------------
+# On this day in history (Wikipedia's free, keyless feed)
+# ---------------------------------------------------------------------------
+
+_onthisday_cache = {}      # "MM-DD" -> (fetched_at, payload)
+_onthisday_lock = threading.Lock()
+ONTHISDAY_TTL_S = 12 * 3600
+
+
+def _otd_item(e):
+    pages = e.get("pages") or []
+    page = pages[0] if pages else {}
+    thumb = (page.get("thumbnail") or {}).get("source")
+    link = ((page.get("content_urls") or {}).get("desktop") or {}).get("page")
+    return {"year": e.get("year"), "text": e.get("text", ""), "link": link, "thumb": thumb,
+            "about": page.get("description")}
+
+
+def _article_lengths(titles):
+    """Article size in bytes for each Wikipedia title — a decent stand-in for how famous someone is."""
+    sizes = {}
+    for i in range(0, len(titles), 50):
+        try:
+            j = http_get_json("https://en.wikipedia.org/w/api.php?" + urlencode({
+                "action": "query", "prop": "info", "format": "json", "formatversion": "2",
+                "titles": "|".join(titles[i:i + 50])}))
+        except Exception:
+            log.warning("Wikipedia article sizes unavailable", exc_info=True)
+            continue
+        q = j.get("query") or {}
+        norm = {n["to"]: n["from"] for n in q.get("normalized") or []}
+        for page in q.get("pages") or []:
+            t = page.get("title", "")
+            sizes[norm.get(t, t)] = page.get("length", 0)
+    return sizes
+
+
+def _otd_people(items, count):
+    """The best-known people (longest Wikipedia articles), listed oldest first."""
+    rows = [(e, (e.get("pages") or [{}])[0].get("title")) for e in items if e.get("year") is not None]
+    sizes = _article_lengths([t for _, t in rows if t])
+    rows.sort(key=lambda r: sizes.get(r[1], 0), reverse=True)
+    people = [_otd_item(e) for e, _ in rows[:count]]
+    people.sort(key=lambda p: p["year"])
+    return people
+
+
+def on_this_day(month, day):
+    key = f"{month:02d}-{day:02d}"
+    with _onthisday_lock:
+        hit = _onthisday_cache.get(key)
+        if hit and time.time() - hit[0] < ONTHISDAY_TTL_S:
+            return hit[1]
+    j = http_get_json(f"https://en.wikipedia.org/api/rest_v1/feed/onthisday/all/{month:02d}/{day:02d}")
+    events = [_otd_item(e) for e in (j.get("selected") or j.get("events") or [])]
+    events.sort(key=lambda e: e["year"] or 0, reverse=True)
+    payload = {
+        "month": month, "day": day,
+        "events": events[:12],
+        "births": _otd_people(j.get("births") or [], 10),
+        "deaths": _otd_people(j.get("deaths") or [], 8),
+        "holidays": [h.get("text", "") for h in (j.get("holidays") or [])][:6],
+        "source": "Wikipedia",
+    }
+    with _onthisday_lock:
+        _onthisday_cache[key] = (time.time(), payload)
+        if len(_onthisday_cache) > 40:
+            _onthisday_cache.pop(next(iter(_onthisday_cache)))
+    return payload
+
+
+# ---------------------------------------------------------------------------
 # Hourly recorder
 # ---------------------------------------------------------------------------
 
@@ -1010,6 +1081,14 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(200, lookup_history(p.get("id"), lat, lon, day, hour))
                 except LookupError as e:
                     return self._send(404, {"error": str(e)})
+
+            if path == "/api/onthisday":
+                try:
+                    month, day = int(p.get("month", "")), int(p.get("day", ""))
+                    date(2024, month, day)  # leap year, so Feb 29 is allowed
+                except ValueError:
+                    raise ValueError("month and day are required numbers")
+                return self._send(200, on_this_day(month, day))
 
             if path == "/api/locations":
                 return self._send(200, {"locations": all_locations(include_inactive=p.get("all") == "1")})

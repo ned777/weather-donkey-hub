@@ -6,9 +6,10 @@
 <title>Weather Donkey</title>
 <style>
   :root {
-    --bg: #000; --card: #0B0B10; --card2: #101018; --yellow: #FFD400; --cyan: #00D9FF;
-    --teal: #00E0B8; --white: #F5F5FF; --dim: #8C8C99; --faint: #55556a;
-    --line: #1f1f2b; --edge: rgba(0, 224, 184, .45);
+    /* AMOLED: pure #000000 everywhere, bright lines and text so nothing gets lost */
+    --bg: #000000; --card: #000000; --card2: #000000; --yellow: #FFE11A; --cyan: #33E4FF;
+    --teal: #1AFFD1; --white: #FFFFFF; --dim: #C4C4D4; --faint: #9A9AB0;
+    --line: #4A4A62; --edge: #1AFFD1;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--white);
@@ -75,7 +76,7 @@
   .sunrow span:nth-child(2) { color: var(--dim); font-weight: 400; font-size: 12px; }
   .track { position: relative; height: 6px; border-radius: 3px; background: var(--line); margin: 8px 0 4px; }
   .track .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px;
-    background: linear-gradient(90deg, #00D9FF55, var(--yellow)); }
+    background: linear-gradient(90deg, #33E4FF99, var(--yellow)); }
   .track .dot { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--yellow);
     box-shadow: 0 0 8px var(--yellow); transform: translate(-50%, -50%); }
   .status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 9px 16px;
@@ -106,7 +107,7 @@
   .day .x { color: var(--dim); font-size: 11px; text-align: right; line-height: 1.35; }
 
   /* ---------- 12 hours ---------- */
-  .hours-wrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: #22222c transparent; }
+  .hours-wrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: #4A4A62 #000; }
   .hours { display: grid; grid-template-columns: repeat(12, minmax(68px, 1fr)); position: relative; min-width: 816px; }
   .hour { text-align: center; padding: 8px 2px 10px; border-right: 1px solid var(--line); }
   .hour:last-child { border-right: 0; }
@@ -116,7 +117,7 @@
   .chart { grid-column: 1 / -1; height: 46px; border-top: 1px solid var(--line); }
   .chart svg { width: 100%; height: 100%; display: block; }
   .rain { height: 22px; display: flex; align-items: flex-end; justify-content: center; margin-top: 6px; }
-  .rain span { width: 14px; background: #00D9FF66; border-radius: 2px 2px 0 0; }
+  .rain span { width: 14px; background: #33E4FFAA; border-radius: 2px 2px 0 0; }
   .hour .r { color: var(--faint); font-size: 10.5px; margin-top: 2px; }
 
   /* ---------- forms ---------- */
@@ -182,11 +183,41 @@
   .srv span:first-child { color: var(--dim); }
   .msg { color: var(--dim); font-size: 12.5px; margin-top: 6px; }
 
+  /* ---------- on this day ---------- */
+  .c-otd { grid-column: span 12; }
+  .otd-nav { display: flex; align-items: center; gap: 6px; }
+  .otd-nav button { background: none; border: 1px solid var(--line); color: var(--teal); border-radius: 6px;
+    padding: 2px 10px; font-weight: 700; cursor: pointer; }
+  .otd-nav button:hover { border-color: var(--teal); }
+  .otd-nav b { color: var(--white); font-size: 13px; min-width: 92px; text-align: center; }
+  .holidays { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .holidays span { border: 1px solid var(--yellow); color: var(--yellow); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+  .otd { display: grid; grid-template-columns: 2fr 1fr 1fr; }
+  .otd > div { min-width: 0; padding: 12px 16px; border-right: 1px solid var(--line); }
+  .otd > div:last-child { border-right: 0; }
+  .otd h3 { margin: 0 0 6px; color: var(--teal); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; }
+  .ev { display: grid; grid-template-columns: 48px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line);
+    color: var(--white); text-decoration: none; font-size: 13.5px; line-height: 1.4; }
+  .ev:last-child { border-bottom: 0; }
+  .ev .y { color: var(--yellow); font-weight: 800; }
+  a.ev:hover .t { color: var(--cyan); }
+  .person { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center; padding: 7px 0;
+    border-bottom: 1px solid var(--line); color: var(--white); text-decoration: none; font-size: 13px; line-height: 1.35; }
+  .person:last-child { border-bottom: 0; }
+  .person img, .person .ph { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); background: #000; }
+  .person .y { color: var(--yellow); font-weight: 700; }
+  .person small { color: var(--dim); display: block; }
+  a.person:hover .t { color: var(--cyan); }
+  .more { margin-top: 8px; background: none; border: 1px solid var(--line); color: var(--teal); border-radius: 6px;
+    padding: 3px 10px; font-size: 12px; cursor: pointer; }
+
   footer { color: var(--faint); font-size: 11.5px; text-align: center; margin-top: 18px; }
 
   @media (max-width: 1200px) {
     .c-now, .c-days { grid-column: span 12; }
     .c-hist { grid-column: span 12; } .c-conv, .c-locs { grid-column: span 6; }
+    .otd { grid-template-columns: 1fr 1fr; }
+    .otd > div:first-child { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--line); }
   }
   @media (max-width: 720px) {
     .page { padding: 10px 12px 28px; }
@@ -204,6 +235,8 @@
     .hres { grid-template-columns: 1fr; }
     .day { grid-template-columns: 40px 26px 1fr 50px; }
     .day .c { display: none; }
+    .otd { grid-template-columns: 1fr; }
+    .otd > div { border-right: 0; border-bottom: 1px solid var(--line); }
   }
 </style>
 </head>
@@ -258,6 +291,19 @@
     <section class="card c-hours">
       <div class="card-head"><h2>Next 12 Hours</h2><span class="meta">temperature · rain chance</span></div>
       <div class="hours-wrap"><div class="hours" id="hours"></div></div>
+    </section>
+
+    <!-- ON THIS DAY -->
+    <section class="card c-otd">
+      <div class="card-head"><h2>On This Day</h2>
+        <div class="otd-nav"><button id="otdPrev" aria-label="Previous day">‹</button><b id="otdDate"></b>
+          <button id="otdNext" aria-label="Next day">›</button><button id="otdToday">Today</button></div></div>
+      <div class="holidays" id="otdHol" hidden></div>
+      <div class="otd">
+        <div><h3>What happened</h3><div id="otdEvents" class="placeholder">Loading…</div></div>
+        <div><h3>Born today</h3><div id="otdBirths"></div></div>
+        <div><h3>Died today</h3><div id="otdDeaths"></div></div>
+      </div>
     </section>
 
     <!-- HISTORY -->
@@ -323,11 +369,11 @@
       </div>
     </section>
   </div>
-  <footer>Weather from Open-Meteo, MET Norway &amp; 7Timer! · history from your server's recordings and the Open-Meteo archive</footer>
+  <footer>Weather from Open-Meteo, MET Norway &amp; 7Timer! · history from your server's recordings and the Open-Meteo archive · On This Day from Wikipedia</footer>
 </div>
 
 <script>
-const ICONS = {"clear_night": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M12,12 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0\" fill=\"#F5F5FF\"/><path d=\"M15,9 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0\" fill=\"#0B0B10\"/></svg>", "cloudy": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M8,14.5 m-3.3,0 a3.3,3.3 0 1,0 6.6,0 a3.3,3.3 0 1,0 -6.6,0\" fill=\"#F5F5FF\"/><path d=\"M12.5,12 m-4.2,0 a4.2,4.2 0 1,0 8.4,0 a4.2,4.2 0 1,0 -8.4,0\" fill=\"#F5F5FF\"/><path d=\"M17,14 m-3.4,0 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0\" fill=\"#F5F5FF\"/><path d=\"M13,17 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#F5F5FF\"/></svg>", "partial": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7,7 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0\" fill=\"#00D9FF\"/><path d=\"M8,14.5 m-3.3,0 a3.3,3.3 0 1,0 6.6,0 a3.3,3.3 0 1,0 -6.6,0\" fill=\"#F5F5FF\"/><path d=\"M12.5,12 m-4.2,0 a4.2,4.2 0 1,0 8.4,0 a4.2,4.2 0 1,0 -8.4,0\" fill=\"#F5F5FF\"/><path d=\"M17,14 m-3.4,0 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0\" fill=\"#F5F5FF\"/><path d=\"M13,17 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#F5F5FF\"/></svg>", "rainy": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7.5,12.5 m-3.1,0 a3.1,3.1 0 1,0 6.2,0 a3.1,3.1 0 1,0 -6.2,0\" fill=\"#F5F5FF\"/><path d=\"M12,10.2 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#F5F5FF\"/><path d=\"M16.5,12.2 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0\" fill=\"#F5F5FF\"/><path d=\"M12.5,15 m-3.8,0 a3.8,3.8 0 1,0 7.6,0 a3.8,3.8 0 1,0 -7.6,0\" fill=\"#F5F5FF\"/><path d=\"M8,18 L7,22 L8.5,22 L9.5,18 Z\" fill=\"#FFD400\"/><path d=\"M12,19 L11,23 L12.5,23 L13.5,19 Z\" fill=\"#FFD400\"/><path d=\"M16,18 L15,22 L16.5,22 L17.5,18 Z\" fill=\"#FFD400\"/></svg>", "snowy": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7.5,12.5 m-3.1,0 a3.1,3.1 0 1,0 6.2,0 a3.1,3.1 0 1,0 -6.2,0\" fill=\"#F5F5FF\"/><path d=\"M12,10.2 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#F5F5FF\"/><path d=\"M16.5,12.2 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0\" fill=\"#F5F5FF\"/><path d=\"M12.5,15 m-3.8,0 a3.8,3.8 0 1,0 7.6,0 a3.8,3.8 0 1,0 -7.6,0\" fill=\"#F5F5FF\"/><path d=\"M8,20 m-1.3,0 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0\" fill=\"#00D9FF\"/><path d=\"M12.5,21 m-1.3,0 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0\" fill=\"#00D9FF\"/><path d=\"M17,20 m-1.3,0 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0\" fill=\"#00D9FF\"/></svg>", "sunny": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M12,12 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0\" fill=\"#00D9FF\"/><path d=\"M11,2 L13,2 L13,5.5 L11,5.5 Z\" fill=\"#00D9FF\"/><path d=\"M11,18.5 L13,18.5 L13,22 L11,22 Z\" fill=\"#00D9FF\"/><path d=\"M2,11 L5.5,11 L5.5,13 L2,13 Z\" fill=\"#00D9FF\"/><path d=\"M18.5,11 L22,11 L22,13 L18.5,13 Z\" fill=\"#00D9FF\"/></svg>", "windy": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M3,8 L17,8 L17,9.5 L3,9.5 Z\" fill=\"#00E0B8\"/><path d=\"M3,12.2 L20,12.2 L20,13.7 L3,13.7 Z\" fill=\"#00E0B8\"/><path d=\"M3,16.4 L13,16.4 L13,17.9 L3,17.9 Z\" fill=\"#00E0B8\"/></svg>", "logo": "<svg viewBox=\"0 0 108 108\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M20,50 L26,50 L26,64 L20,64 Z\" fill=\"#00E0B8\"/><path d=\"M23,66 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#00E0B8\"/><path d=\"M28,46 L74,46 L74,68 L28,68 Z\" fill=\"#00D9FF\"/><path d=\"M32,68 L38,68 L38,90 L32,90 Z\" fill=\"#00E0B8\"/><path d=\"M44,68 L50,68 L50,90 L44,90 Z\" fill=\"#00E0B8\"/><path d=\"M54,68 L60,68 L60,90 L54,90 Z\" fill=\"#00E0B8\"/><path d=\"M66,68 L72,68 L72,90 L66,90 Z\" fill=\"#00E0B8\"/><path d=\"M32,87 L38,87 L38,90 L32,90 Z\" fill=\"#F5F5FF\"/><path d=\"M44,87 L50,87 L50,90 L44,90 Z\" fill=\"#F5F5FF\"/><path d=\"M54,87 L60,87 L60,90 L54,90 Z\" fill=\"#F5F5FF\"/><path d=\"M66,87 L72,87 L72,90 L66,90 Z\" fill=\"#F5F5FF\"/><path d=\"M66,34 L90,34 L90,54 L66,54 Z\" fill=\"#00D9FF\"/><path d=\"M84,44 L98,44 L98,54 L84,54 Z\" fill=\"#00D9FF\"/><path d=\"M92,45 L98,45 L98,53 L92,53 Z\" fill=\"#F5F5FF\"/><path d=\"M68,34 L63,14 L70,13 L76,33 Z\" fill=\"#00E0B8\"/><path d=\"M66.5,13.5 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#00E0B8\"/><path d=\"M88,34 L93,14 L86,13 L80,33 Z\" fill=\"#00E0B8\"/><path d=\"M89.5,13.5 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#00E0B8\"/><path d=\"M68,30 L72,30 L72,36 L68,36 Z\" fill=\"#00E0B8\"/><path d=\"M75,30 L79,30 L79,36 L75,36 Z\" fill=\"#00E0B8\"/><path d=\"M80,42 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0\" fill=\"#C2185B\"/><path d=\"M95,49 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0\" fill=\"#C2185B\"/></svg>"};
+const ICONS = {"clear_night": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M12,12 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0\" fill=\"#F5F5FF\"/><path d=\"M15,9 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0\" fill=\"#000000\"/></svg>", "cloudy": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M8,14.5 m-3.3,0 a3.3,3.3 0 1,0 6.6,0 a3.3,3.3 0 1,0 -6.6,0\" fill=\"#F5F5FF\"/><path d=\"M12.5,12 m-4.2,0 a4.2,4.2 0 1,0 8.4,0 a4.2,4.2 0 1,0 -8.4,0\" fill=\"#F5F5FF\"/><path d=\"M17,14 m-3.4,0 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0\" fill=\"#F5F5FF\"/><path d=\"M13,17 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#F5F5FF\"/></svg>", "partial": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7,7 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0\" fill=\"#00D9FF\"/><path d=\"M8,14.5 m-3.3,0 a3.3,3.3 0 1,0 6.6,0 a3.3,3.3 0 1,0 -6.6,0\" fill=\"#F5F5FF\"/><path d=\"M12.5,12 m-4.2,0 a4.2,4.2 0 1,0 8.4,0 a4.2,4.2 0 1,0 -8.4,0\" fill=\"#F5F5FF\"/><path d=\"M17,14 m-3.4,0 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0\" fill=\"#F5F5FF\"/><path d=\"M13,17 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#F5F5FF\"/></svg>", "rainy": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7.5,12.5 m-3.1,0 a3.1,3.1 0 1,0 6.2,0 a3.1,3.1 0 1,0 -6.2,0\" fill=\"#F5F5FF\"/><path d=\"M12,10.2 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#F5F5FF\"/><path d=\"M16.5,12.2 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0\" fill=\"#F5F5FF\"/><path d=\"M12.5,15 m-3.8,0 a3.8,3.8 0 1,0 7.6,0 a3.8,3.8 0 1,0 -7.6,0\" fill=\"#F5F5FF\"/><path d=\"M8,18 L7,22 L8.5,22 L9.5,18 Z\" fill=\"#FFD400\"/><path d=\"M12,19 L11,23 L12.5,23 L13.5,19 Z\" fill=\"#FFD400\"/><path d=\"M16,18 L15,22 L16.5,22 L17.5,18 Z\" fill=\"#FFD400\"/></svg>", "snowy": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7.5,12.5 m-3.1,0 a3.1,3.1 0 1,0 6.2,0 a3.1,3.1 0 1,0 -6.2,0\" fill=\"#F5F5FF\"/><path d=\"M12,10.2 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#F5F5FF\"/><path d=\"M16.5,12.2 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0\" fill=\"#F5F5FF\"/><path d=\"M12.5,15 m-3.8,0 a3.8,3.8 0 1,0 7.6,0 a3.8,3.8 0 1,0 -7.6,0\" fill=\"#F5F5FF\"/><path d=\"M8,20 m-1.3,0 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0\" fill=\"#00D9FF\"/><path d=\"M12.5,21 m-1.3,0 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0\" fill=\"#00D9FF\"/><path d=\"M17,20 m-1.3,0 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0\" fill=\"#00D9FF\"/></svg>", "sunny": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M12,12 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0\" fill=\"#00D9FF\"/><path d=\"M11,2 L13,2 L13,5.5 L11,5.5 Z\" fill=\"#00D9FF\"/><path d=\"M11,18.5 L13,18.5 L13,22 L11,22 Z\" fill=\"#00D9FF\"/><path d=\"M2,11 L5.5,11 L5.5,13 L2,13 Z\" fill=\"#00D9FF\"/><path d=\"M18.5,11 L22,11 L22,13 L18.5,13 Z\" fill=\"#00D9FF\"/></svg>", "windy": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M3,8 L17,8 L17,9.5 L3,9.5 Z\" fill=\"#00E0B8\"/><path d=\"M3,12.2 L20,12.2 L20,13.7 L3,13.7 Z\" fill=\"#00E0B8\"/><path d=\"M3,16.4 L13,16.4 L13,17.9 L3,17.9 Z\" fill=\"#00E0B8\"/></svg>", "logo": "<svg viewBox=\"0 0 108 108\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M20,50 L26,50 L26,64 L20,64 Z\" fill=\"#00E0B8\"/><path d=\"M23,66 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#00E0B8\"/><path d=\"M28,46 L74,46 L74,68 L28,68 Z\" fill=\"#00D9FF\"/><path d=\"M32,68 L38,68 L38,90 L32,90 Z\" fill=\"#00E0B8\"/><path d=\"M44,68 L50,68 L50,90 L44,90 Z\" fill=\"#00E0B8\"/><path d=\"M54,68 L60,68 L60,90 L54,90 Z\" fill=\"#00E0B8\"/><path d=\"M66,68 L72,68 L72,90 L66,90 Z\" fill=\"#00E0B8\"/><path d=\"M32,87 L38,87 L38,90 L32,90 Z\" fill=\"#F5F5FF\"/><path d=\"M44,87 L50,87 L50,90 L44,90 Z\" fill=\"#F5F5FF\"/><path d=\"M54,87 L60,87 L60,90 L54,90 Z\" fill=\"#F5F5FF\"/><path d=\"M66,87 L72,87 L72,90 L66,90 Z\" fill=\"#F5F5FF\"/><path d=\"M66,34 L90,34 L90,54 L66,54 Z\" fill=\"#00D9FF\"/><path d=\"M84,44 L98,44 L98,54 L84,54 Z\" fill=\"#00D9FF\"/><path d=\"M92,45 L98,45 L98,53 L92,53 Z\" fill=\"#F5F5FF\"/><path d=\"M68,34 L63,14 L70,13 L76,33 Z\" fill=\"#00E0B8\"/><path d=\"M66.5,13.5 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#00E0B8\"/><path d=\"M88,34 L93,14 L86,13 L80,33 Z\" fill=\"#00E0B8\"/><path d=\"M89.5,13.5 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0\" fill=\"#00E0B8\"/><path d=\"M68,30 L72,30 L72,36 L68,36 Z\" fill=\"#00E0B8\"/><path d=\"M75,30 L79,30 L79,36 L75,36 Z\" fill=\"#00E0B8\"/><path d=\"M80,42 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0\" fill=\"#C2185B\"/><path d=\"M95,49 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0\" fill=\"#C2185B\"/></svg>"};
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 $("logo").innerHTML = ICONS.logo;
@@ -465,7 +511,7 @@ function renderWeather() {
   $("updated").textContent = "Updated " + when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
   const rec = active?.id === "home"
     ? '<span class="pill"><i></i>Recorded every 2 h</span>'
-    : '<span class="pill" title="Only Home is recorded; history for this city comes from the archive"><i style="background:#55556a"></i>Live only</span>';
+    : '<span class="pill" title="Only Home is recorded; history for this city comes from the archive"><i style="background:#9A9AB0"></i>Live only</span>';
   $("pills").innerHTML = rec + " " + Object.entries(s.sources || {}).map(([k, v]) =>
     `<span class="pill ${v === "ok" ? "" : "down"}" title="${v}"><i></i>${SOURCE_NAMES[k] || k}</span>`).join(" ");
   $("notice").hidden = !s.notice;
@@ -515,7 +561,7 @@ function renderHours(s) {
   }).join("");
   $("hours").innerHTML = cells +
     `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <polyline points="${line}" fill="none" stroke="#00D9FF" stroke-width="2" vector-effect="non-scaling-stroke"/>
+      <polyline points="${line}" fill="none" stroke="#33E4FF" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
     </svg></div>`;
   $("hours").style.gridTemplateColumns = `repeat(${n}, minmax(68px, 1fr))`;
   void dots;
@@ -685,6 +731,51 @@ async function loadStats() {
 const fmt = v => { const r = Math.round(v * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
 $("fahrenheit").oninput = e => { const f = parseFloat(e.target.value); $("celsius").value = isNaN(f) ? "" : fmt((f - 32) * 5 / 9); };
 $("celsius").oninput = e => { const c = parseFloat(e.target.value); $("fahrenheit").value = isNaN(c) ? "" : fmt(c * 9 / 5 + 32); };
+
+// ---- on this day -----------------------------------------------------------------------
+let otdDay = new Date(), otdAll = false;
+const ext = u => u && /^https:\/\//.test(u) ? u : null;
+function otdLink(item, cls, inner) {
+  const href = ext(item.link);
+  return href ? `<a class="${cls}" href="${esc(href)}" target="_blank" rel="noopener">${inner}</a>` : `<div class="${cls}">${inner}</div>`;
+}
+const yr = y => y < 0 ? `${-y} BC` : y;
+function person(p) {
+  const img = ext(p.thumb) ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : `<span class="ph"></span>`;
+  const [name, ...rest] = p.text.split(", ");
+  return otdLink(p, "person", `${img}<div><span class="t"><b>${esc(name)}</b></span>
+    <small><span class="y">${yr(p.year)}</span> · ${esc(rest.join(", ") || p.about || "")}</small></div>`);
+}
+function renderOtd(r) {
+  const shown = otdAll ? r.events : r.events.slice(0, 6);
+  $("otdEvents").className = "";
+  $("otdEvents").innerHTML = shown.map(e =>
+    otdLink(e, "ev", `<span class="y">${yr(e.year)}</span><span class="t">${esc(e.text)}</span>`)).join("") +
+    (r.events.length > 6 ? `<button class="more" id="otdMore">${otdAll ? "Show fewer" : `Show all ${r.events.length}`}</button>` : "");
+  if ($("otdMore")) $("otdMore").onclick = () => { otdAll = !otdAll; renderOtd(r); };
+  $("otdBirths").innerHTML = r.births.map(person).join("") || '<span class="placeholder">Nothing listed.</span>';
+  $("otdDeaths").innerHTML = r.deaths.map(person).join("") || '<span class="placeholder">Nothing listed.</span>';
+  $("otdHol").hidden = !r.holidays.length;
+  $("otdHol").innerHTML = r.holidays.map(h => `<span>${esc(h)}</span>`).join("");
+}
+async function loadOtd() {
+  const m = otdDay.getMonth() + 1, d = otdDay.getDate();
+  $("otdDate").textContent = otdDay.toLocaleDateString([], { month: "long", day: "numeric" });
+  $("otdEvents").className = "placeholder"; $("otdEvents").textContent = "Loading…";
+  otdAll = false;
+  try {
+    const r = await api(`/api/onthisday?month=${m}&day=${d}`);
+    if (r.month === otdDay.getMonth() + 1 && r.day === otdDay.getDate()) renderOtd(r);
+  } catch (e) {
+    $("otdEvents").textContent = "Couldn't reach Wikipedia right now.";
+    $("otdBirths").innerHTML = $("otdDeaths").innerHTML = "";
+  }
+}
+const shiftOtd = n => { otdDay = new Date(otdDay); otdDay.setDate(otdDay.getDate() + n); loadOtd(); };
+$("otdPrev").onclick = () => shiftOtd(-1);
+$("otdNext").onclick = () => shiftOtd(1);
+$("otdToday").onclick = () => { otdDay = new Date(); loadOtd(); };
+loadOtd();
 
 // ---- start -------------------------------------------------------------------------------
 (async () => {
