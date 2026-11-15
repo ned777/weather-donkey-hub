@@ -216,6 +216,10 @@ class WeatherWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.sunriseText, sunriseStr)
             views.setTextViewText(R.id.sunsetText, sunsetStr)
             views.setTextViewText(R.id.updatedText, statusText)
+            // While refreshing, "Updating…" (bigger) takes the place of both bottom lines.
+            val updating = statusText == context.getString(R.string.widget_loading)
+            views.setViewVisibility(R.id.refreshLines, if (updating) View.INVISIBLE else View.VISIBLE)
+            views.setViewVisibility(R.id.updatingText, if (updating) View.VISIBLE else View.GONE)
             views.setTextViewText(R.id.forecast1Day, forecast1Day)
             views.setTextViewText(R.id.forecast1HighLow, forecast1HighLow)
             views.setTextViewText(R.id.forecast1Condition, forecast1Condition)

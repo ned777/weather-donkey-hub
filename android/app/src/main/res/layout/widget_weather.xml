@@ -256,13 +256,20 @@
 
     <!-- The refresh area: "Tap to refresh" over the status line. Tapping HERE fetches new
          weather; tapping anywhere else on the widget opens the app. -->
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/refreshArea"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
         android:paddingTop="2dp"
-        android:paddingBottom="2dp"
+        android:paddingBottom="2dp">
+
+    <!-- The two normal lines. While a refresh runs they turn INVISIBLE (still holding
+         their space) and updatingText shows in that same spot. -->
+    <LinearLayout
+        android:id="@+id/refreshLines"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical">
 
     <TextView
@@ -292,5 +299,19 @@
         android:ellipsize="end"
         android:text="" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/updatingText"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:includeFontPadding="false"
+        android:gravity="center"
+        android:textColor="@color/retro_cyan"
+        android:textStyle="bold"
+        android:textSize="15sp"
+        android:maxLines="1"
+        android:text="@string/widget_loading"
+        android:visibility="gone" />
+    </FrameLayout>
 
 </LinearLayout>
