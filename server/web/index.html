@@ -47,7 +47,7 @@
   .c-now { display: flex; flex-direction: column; }
   .c-now .stats { flex: 1; grid-auto-rows: 1fr; }
   @media (min-width: 721px) {
-    .c-now .stat .v { font-size: 38px; gap: 8px; }
+    .c-now .stat .v { font-size: min(38px, 4.1cqw); gap: 8px; }
     .c-now .stat .label { font-size: 14.5px; }
     .c-now .stat .s { font-size: 15.5px; margin-top: 4px; }
     .c-now .stat .arrow { font-size: 30px; }
@@ -66,24 +66,14 @@
   /* Temperature + condition stay together as one centered group at every width. */
   .hero { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 36px; padding: 14px 18px 10px; }
   .hero .left { text-align: center; }
-  /* Wide card only: an animated scene on the left and the next 3 hours on the right. */
+  /* Wide card only: an animated scene on the left. */
   .c-now { container-type: inline-size; }
-  .scene, .nextup { display: none; }
+  .scene { display: none; }
   @container (min-width: 700px) {
     .hero { justify-content: space-evenly; }
-    .scene { display: block; width: 150px; height: 150px; flex: 0 0 auto; }
+    .scene { display: block; width: 170px; height: 170px; flex: 0 0 auto; }
     .scene svg { width: 100%; height: 100%; overflow: visible; }
   }
-  @container (min-width: 880px) {
-    .nextup { display: block; flex: 0 0 auto; min-width: 190px; border-left: 1px solid var(--line); padding-left: 22px; }
-  }
-  .nextup h4 { margin: 0 0 6px; color: var(--teal); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; }
-  .nextup .row { display: grid; grid-template-columns: 50px 34px 48px 1fr; align-items: center; gap: 6px; padding: 4px 0; }
-  .nextup .row .t { color: var(--dim); font-size: 15px; font-weight: 600; }
-  .nextup .row svg { width: 30px; height: 30px; }
-  .nextup .row .v { font-size: 20px; font-weight: 800; }
-  .nextup .row .r { color: var(--faint); font-size: 14px; font-weight: 700; }
-  .nextup .row .r.wet { color: var(--cyan); }
   /* scene animations */
   @keyframes wd-spin { to { transform: rotate(360deg); } }
   @keyframes wd-pulse { 50% { opacity: .55; transform: scale(1.08); } }
@@ -105,15 +95,15 @@
   .scene .flake { animation: wd-snow 3.2s linear infinite; }
   .scene .gust { stroke-dasharray: 60 60; animation: wd-dash 2.4s linear infinite; }
   @media (prefers-reduced-motion: reduce) { .scene * { animation: none !important; } }
-  .today { color: var(--teal); font-weight: 700; letter-spacing: .1em; font-size: 15px; }
+  .today { color: var(--teal); font-weight: 700; letter-spacing: .1em; font-size: 17px; }
   .temp { font-weight: 800; line-height: .95; color: transparent; -webkit-text-stroke: 4px var(--cyan);
-    font-size: min(150px, 24vw); white-space: nowrap; } /* full size; only shrinks on very narrow screens */
+    font-size: min(180px, 26vw); white-space: nowrap; } /* full size; only shrinks on very narrow screens */
   .place { color: var(--dim); font-size: 13.5px; margin-top: 2px; }
   .cond { display: flex; align-items: center; gap: 10px; }
-  .cond svg { width: 44px; height: 44px; }
-  .cond span { color: var(--yellow); font-size: 28px; font-weight: 700; }
-  .hl { font-size: 22px; font-weight: 700; margin: 8px 0 2px; }
-  .feels { color: var(--dim); font-size: 15.5px; }
+  .cond svg { width: 56px; height: 56px; }
+  .cond span { color: var(--yellow); font-size: 36px; font-weight: 700; }
+  .hl { font-size: 32px; font-weight: 800; margin: 10px 0 4px; }
+  .feels { color: var(--dim); font-size: 19px; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); }
   .stat { padding: 12px 16px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0;
     display: flex; flex-direction: column; justify-content: center; }
@@ -299,7 +289,7 @@
     .tabs { order: 3; flex-basis: 100%; }
     .c-conv, .c-locs { grid-column: span 12; }
     .hero { gap: 6px 18px; padding: 12px 10px 10px; }
-    .cond span { font-size: 24px; } .hl { font-size: 20px; }
+    .cond span { font-size: 26px; } .hl { font-size: 23px; } .cond svg { width: 44px; height: 44px; }
     .stats { grid-template-columns: repeat(2, 1fr); }
     .stat:nth-child(4n) { border-right: 1px solid var(--line); }
     .stat:nth-child(2n) { border-right: 0; }
@@ -342,7 +332,6 @@
           <div class="hl" id="hl">H:--°  L:--°</div>
           <div class="feels" id="feels"></div>
         </div>
-        <div class="nextup" id="nextup"></div>
       </div>
       <div class="stats" id="stats"></div>
       <div class="sunbar">
@@ -624,16 +613,6 @@ function scene(key, isDay) {
   } else body = sky;
   return `<svg viewBox="0 0 120 120">${body}</svg>`;
 }
-function renderNextUp(s) {
-  const hs = (s.hourly || []).slice(0, 3);
-  $("nextup").innerHTML = hs.length ? `<h4>Next 3 hours</h4>` + hs.map(h => {
-    const [, k] = condition(h.code, h.wind_mph);
-    const r = h.rain_pct < 0 ? 0 : h.rain_pct;
-    return `<div class="row"><span class="t">${clock(h.time)}</span>${icon(k, h.is_day)}
-      <span class="v">${deg(h.temp_f)}</span><span class="r${r >= 20 ? " wet" : ""}">💧${pct(h.rain_pct)}</span></div>`;
-  }).join("") : "";
-}
-
 function renderWeather() {
   if (!lastSnapshot) return;
   const s = view();
@@ -646,7 +625,6 @@ function renderWeather() {
   $("feels").textContent = d.feels_like_f != null ? `Feels like ${deg(d.feels_like_f)}` : "";
   $("condIcon").innerHTML = icon(key, s.is_day);
   $("scene").innerHTML = scene(key, s.is_day);
-  renderNextUp(s);
   $("cond").textContent = label(l, s.is_day);
   $("nowMeta").textContent = active ? `${active.lat.toFixed(3)}, ${active.lon.toFixed(3)}` : "";
 
