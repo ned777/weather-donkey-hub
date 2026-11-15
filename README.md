@@ -151,5 +151,5 @@ for whichever tab is open.
 There's no background timer on the phone, and opening the app doesn't refresh.
 Weather refreshes only when you pull down, or tap the widget's **Tap to refresh** strip (tapping the rest
 of the widget opens the app). Tap the donkey or the title for the city list:
-tap to switch; long-press for sort mode (≡ on the left to drag, ✕ on the right to remove
+tap to switch; long-press for sort mode (drag a city from anywhere on its row, ✕ on the right to remove
 with a confirm; ✓ saves the order, ✕ at the top cancels).

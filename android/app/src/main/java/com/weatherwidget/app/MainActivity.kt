@@ -662,7 +662,8 @@ class MainActivity : AppCompatActivity() {
                 sorting -> View.INVISIBLE // keeps Current's name lined up with the others
                 else -> View.GONE
             }
-            holder.handle.setOnTouchListener(if (!showControls) null else View.OnTouchListener { _, ev ->
+            // In sort mode, touching anywhere on the row picks it up (the ✕ handles its own taps).
+            holder.row.setOnTouchListener(if (!showControls) null else View.OnTouchListener { _, ev ->
                 if (ev.actionMasked == MotionEvent.ACTION_DOWN) dragHelper.startDrag(holder)
                 false
             })
