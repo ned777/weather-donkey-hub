@@ -48,8 +48,8 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
 ```
 
 - **Has its own web page** at http://192.168.1.5:8094: a pure-black (AMOLED)
-  dashboard with current conditions (feels-like, humidity, wind direction and gusts,
-  pressure, cloud cover, UV, a daylight bar, and the moon: tonight's phase and
+  dashboard with current conditions (8 compact detail boxes sized like the app's: feels-like,
+  humidity, wind direction and gusts, pressure, cloud cover, UV; a daylight bar; and the moon: tonight's phase and
   % lit plus the dates of the next new, first-quarter, full and last-quarter moons), the 12-hour and 5-day
   forecasts, *What Was the Weather?*, **On This Day** (events, famous births and
   deaths, and holidays — downloaded from Wikipedia once a year and served from

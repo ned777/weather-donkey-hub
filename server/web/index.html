@@ -47,10 +47,10 @@
   .c-now { display: flex; flex-direction: column; }
   .c-now .stats { flex: 1; grid-auto-rows: 1fr; }
   @media (min-width: 721px) {
-    .c-now .stat .v { font-size: min(38px, 4.1cqw); gap: 8px; }
-    .c-now .stat .label { font-size: 14.5px; }
-    .c-now .stat .s { font-size: 15.5px; margin-top: 4px; }
-    .c-now .stat .arrow { font-size: 30px; }
+    .c-now .stat .v { font-size: min(26px, 3cqw); gap: 7px; }
+    .c-now .stat .label { font-size: 12.5px; }
+    .c-now .stat .s { font-size: 13.5px; margin-top: 2px; }
+    .c-now .stat .arrow { font-size: 21px; }
   }
   #days { flex: 1; display: flex; flex-direction: column; }
   #days .day { flex: 1; }
@@ -105,12 +105,13 @@
   .hl { font-size: 32px; font-weight: 800; margin: 10px 0 4px; }
   .feels { color: var(--dim); font-size: 19px; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); }
-  .stat { padding: 12px 16px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0;
+  .stat { padding: 8px 13px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0;
     display: flex; flex-direction: column; justify-content: center; }
   .stat:nth-child(4n) { border-right: 0; }
-  .stat .v { font-size: 26px; font-weight: 800; margin-top: 4px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
-  .stat .s { color: var(--faint); font-size: 14px; margin-top: 2px; }
-  .arrow { display: inline-block; color: var(--teal); font-size: 22px; }
+  .stat .v { font-size: 18px; font-weight: 800; margin-top: 2px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .stat .s { color: var(--faint); font-size: 12px; margin-top: 1px; }
+  .stat .label { font-size: 11px; letter-spacing: .1em; }
+  .arrow { display: inline-block; color: var(--teal); font-size: 17px; }
   .sunbar { padding: 10px 16px 4px; }
   .sunrow { display: flex; justify-content: space-between; font-size: 14.5px; font-weight: 700; }
   .sunrow span:nth-child(2) { color: var(--dim); font-weight: 400; font-size: 13.5px; }
