@@ -19,8 +19,9 @@ that:
   times, because its server sometimes stalls mid-handshake). If a source still
   fails, its last good answer for that place (up to 3 hours old, trimmed to the
   hours still ahead) is shown instead, so a short blip doesn't show the note at all;
-  it's never recorded. After each scheduled run, places where a source failed are
-  retried after 2, 5 and 10 minutes so Home's recording isn't lost. A request fails
+  it's never recorded. After any fetch where a source failed (scheduled or ↻ Refresh /
+  pull-down), that place is quietly retried after 2, 5 and 10 minutes, so the note
+  clears by itself once the source is back and Home's recording isn't lost. A request fails
   only if all three are down and nothing recent is saved.
 - **Server refreshes every 3 hours on the clock (12, 3, 6, 9).** Opening the web page
   never fetches; it shows the latest scheduled snapshot. ↻ Refresh fetches right away without

@@ -1286,6 +1286,36 @@ def _reuse_stale(source, saved, lon):
     return data
 
 
+_retrying = set()  # places with a follow-up retry already waiting
+
+
+def _retry_failed_soon(key, loc_id, lat, lon, name):
+    """A source failed on a fetch someone asked for: quietly try that place again
+    after 2, 5 and 10 minutes so the yellow note clears by itself once it's back."""
+    with _live_lock:
+        if key in _retrying:
+            return
+        _retrying.add(key)
+
+    def run():
+        try:
+            for delay in SCHEDULED_RETRY_DELAYS_S:
+                time.sleep(delay)
+                live_weather(loc_id, lat, lon, name, fresh=True, scheduled=True)
+                with _live_lock:
+                    if not (_live.get(key) or {}).get("failed"):
+                        log.info("Follow-up retry for %s: all sources back", key)
+                        return
+            log.info("Follow-up retries for %s gave up; the next scheduled run will try again", key)
+        except Exception:
+            log.exception("Follow-up retry failed for %s", key)
+        finally:
+            with _live_lock:
+                _retrying.discard(key)
+
+    threading.Thread(target=run, name=f"retry {key}", daemon=True).start()
+
+
 def live_weather(loc_id, lat, lon, name, fresh=False, scheduled=False):
     """
     The weather for one place. Returns the cached snapshot from the current 3-hour
@@ -1330,6 +1360,8 @@ def live_weather(loc_id, lat, lon, name, fresh=False, scheduled=False):
                 _save_live_cache()
             except OSError:
                 log.exception("Could not save the weather cache")
+            if failed and not scheduled:  # the schedule does its own retries
+                _retry_failed_soon(key, loc_id, lat, lon, name)
     if name:
         resp["city"] = name
     return resp, None
