@@ -50,7 +50,7 @@
     <string name="drawer_title">Locations</string>
     <string name="drawer_add">+ Add city</string>
     <string name="remove_city_confirm">Remove %1$s?</string>
-    <string name="widget_tap_refresh">Tap to refresh</string>
+    <string name="widget_tap_refresh">Tap below to refresh</string>
     <string name="save">Save</string>
     <string name="drawer_sorting">Drag to sort</string>
 </resources>
