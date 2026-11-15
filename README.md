@@ -43,7 +43,8 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
   pressure, cloud cover, UV, and a daylight bar), the 12-hour and 5-day
   forecasts, *What Was the Weather?*, **On This Day** (events, famous births and
   deaths, and holidays — downloaded from Wikipedia once a year and served from
-  the server), the °F ⇄ °C converter, and location management. You can save a city by name or US ZIP code to view it, remove a
+  the server), the °F ⇄ °C converter (with the math worked out for your number,
+  both formulas, and tricks for converting in your head), and location management. You can save a city by name or US ZIP code to view it, remove a
   city, or move Home if the server moves.
 - **Keeps the app and the web page in sync.** Cities added or removed on either
   one carry over to the other on the app's next pull-to-refresh.
