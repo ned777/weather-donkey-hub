@@ -66,6 +66,45 @@
   /* Temperature + condition stay together as one centered group at every width. */
   .hero { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 36px; padding: 14px 18px 10px; }
   .hero .left { text-align: center; }
+  /* Wide card only: an animated scene on the left and the next 3 hours on the right. */
+  .c-now { container-type: inline-size; }
+  .scene, .nextup { display: none; }
+  @container (min-width: 700px) {
+    .hero { justify-content: space-evenly; }
+    .scene { display: block; width: 150px; height: 150px; flex: 0 0 auto; }
+    .scene svg { width: 100%; height: 100%; overflow: visible; }
+  }
+  @container (min-width: 880px) {
+    .nextup { display: block; flex: 0 0 auto; min-width: 190px; border-left: 1px solid var(--line); padding-left: 22px; }
+  }
+  .nextup h4 { margin: 0 0 6px; color: var(--teal); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; }
+  .nextup .row { display: grid; grid-template-columns: 50px 34px 48px 1fr; align-items: center; gap: 6px; padding: 4px 0; }
+  .nextup .row .t { color: var(--dim); font-size: 15px; font-weight: 600; }
+  .nextup .row svg { width: 30px; height: 30px; }
+  .nextup .row .v { font-size: 20px; font-weight: 800; }
+  .nextup .row .r { color: var(--faint); font-size: 14px; font-weight: 700; }
+  .nextup .row .r.wet { color: var(--cyan); }
+  /* scene animations */
+  @keyframes wd-spin { to { transform: rotate(360deg); } }
+  @keyframes wd-pulse { 50% { opacity: .55; transform: scale(1.08); } }
+  @keyframes wd-float { 50% { transform: translateY(-6px); } }
+  @keyframes wd-twinkle { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+  @keyframes wd-drift { 50% { transform: translateX(10px); } }
+  @keyframes wd-drift2 { 50% { transform: translateX(-12px); } }
+  @keyframes wd-fall { from { transform: translateY(-10px); opacity: 0; } 20% { opacity: 1; } to { transform: translateY(42px); opacity: 0; } }
+  @keyframes wd-snow { from { transform: translate(0, -8px); opacity: 0; } 20% { opacity: 1; } 50% { transform: translate(5px, 18px); } to { transform: translate(-3px, 44px); opacity: 0; } }
+  @keyframes wd-dash { to { stroke-dashoffset: -120; } }
+  .scene .spin, .scene .glow, .scene .float, .scene .drift, .scene .drift2 { transform-box: fill-box; transform-origin: center; }
+  .scene .spin { animation: wd-spin 24s linear infinite; }
+  .scene .glow { animation: wd-pulse 4s ease-in-out infinite; }
+  .scene .float { animation: wd-float 6s ease-in-out infinite; }
+  .scene .tw { animation: wd-twinkle 3s ease-in-out infinite; }
+  .scene .drift { animation: wd-drift 7s ease-in-out infinite; }
+  .scene .drift2 { animation: wd-drift2 9s ease-in-out infinite; }
+  .scene .drop { animation: wd-fall 1.1s linear infinite; }
+  .scene .flake { animation: wd-snow 3.2s linear infinite; }
+  .scene .gust { stroke-dasharray: 60 60; animation: wd-dash 2.4s linear infinite; }
+  @media (prefers-reduced-motion: reduce) { .scene * { animation: none !important; } }
   .today { color: var(--teal); font-weight: 700; letter-spacing: .1em; font-size: 15px; }
   .temp { font-weight: 800; line-height: .95; color: transparent; -webkit-text-stroke: 4px var(--cyan);
     font-size: min(150px, 24vw); white-space: nowrap; } /* full size; only shrinks on very narrow screens */
@@ -292,6 +331,7 @@
       <div class="card-head"><h2>Right Now</h2><button class="refresh" id="refresh">↻ Refresh</button><span class="meta" id="nowMeta"></span></div>
       <div class="srcpick" id="srcpick" role="group" aria-label="Weather source"></div>
       <div class="hero">
+        <div class="scene" id="scene" aria-hidden="true"></div>
         <div class="left">
           <div class="today">TODAY</div>
           <div class="temp" id="temp">--°</div>
@@ -302,6 +342,7 @@
           <div class="hl" id="hl">H:--°  L:--°</div>
           <div class="feels" id="feels"></div>
         </div>
+        <div class="nextup" id="nextup"></div>
       </div>
       <div class="stats" id="stats"></div>
       <div class="sunbar">
@@ -546,6 +587,53 @@ function renderSourcePicker() {
   });
 }
 
+// ---- animated scene beside the big number (wide windows only) ----
+const CLOUD = (x, y, k = 1, fill = "#E8E8F4") =>
+  `<g transform="translate(${x} ${y}) scale(${k})" fill="${fill}">
+     <circle cx="0" cy="10" r="12"/><circle cx="16" cy="0" r="16"/><circle cx="34" cy="8" r="13"/><rect x="0" y="8" width="34" height="14" rx="7"/></g>`;
+function sunSvg(cx, cy, r) {
+  const rays = Array.from({ length: 12 }, (_, i) =>
+    `<rect x="${cx - 2.5}" y="${cy - r - 18}" width="5" height="11" rx="2.5" transform="rotate(${i * 30} ${cx} ${cy})"/>`).join("");
+  return `<circle class="glow" cx="${cx}" cy="${cy}" r="${r + 10}" fill="#FFE11A" opacity=".18"/>
+    <g class="spin" fill="#FFE11A">${rays}</g><circle cx="${cx}" cy="${cy}" r="${r}" fill="#FFE11A"/>`;
+}
+function moonSvg(cx, cy, r) {
+  const stars = [[18, 22, 0], [100, 16, .8], [108, 70, 1.6], [22, 92, 2.2], [70, 8, 1.2], [92, 104, .4]]
+    .map(([x, y, d]) => `<circle class="tw" cx="${x}" cy="${y}" r="2.2" fill="#F5F5FF" style="animation-delay:${d}s"/>`).join("");
+  return `${stars}<g class="float" style="filter: drop-shadow(0 0 10px rgba(245,245,255,.45))">
+    <mask id="wdm"><rect width="120" height="120" fill="#fff"/><circle cx="${cx + r * .55}" cy="${cy - r * .35}" r="${r * .9}" fill="#000"/></mask>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#F5F5FF" mask="url(#wdm)"/></g>`;
+}
+function scene(key, isDay) {
+  const sky = isDay ? sunSvg(60, 56, 24) : moonSvg(58, 58, 28);
+  let body;
+  if (key === "sunny") body = sky;
+  else if (key === "partial") body = (isDay ? sunSvg(44, 44, 19) : moonSvg(46, 46, 22)) + `<g class="drift">${CLOUD(46, 66, 1.25)}</g>`;
+  else if (key === "cloudy") body = `<g class="drift2">${CLOUD(14, 34, 1.05, "#9A9AB0")}</g><g class="drift">${CLOUD(40, 58, 1.35)}</g>`;
+  else if (key === "rainy" || key === "snowy") {
+    const drops = Array.from({ length: 7 }, (_, i) => {
+      const x = 30 + i * 10, d = (i * 0.37) % (key === "rainy" ? 1.1 : 3.2);
+      return key === "rainy"
+        ? `<line class="drop" x1="${x}" y1="70" x2="${x - 4}" y2="82" stroke="#33E4FF" stroke-width="3" stroke-linecap="round" style="animation-delay:${d}s"/>`
+        : `<circle class="flake" cx="${x}" cy="74" r="3" fill="#F5F5FF" style="animation-delay:${d}s"/>`;
+    }).join("");
+    body = `${drops}<g class="drift">${CLOUD(22, 26, 1.6)}</g>`;
+  } else if (key === "windy") {
+    body = [[30, 0], [55, .6], [80, 1.2]].map(([y, d], i) =>
+      `<path class="gust" d="M8 ${y} H${80 - i * 10} a12 12 0 1 0 -12 -12" fill="none" stroke="#1AFFD1" stroke-width="5" stroke-linecap="round" style="animation-delay:${d}s"/>`).join("");
+  } else body = sky;
+  return `<svg viewBox="0 0 120 120">${body}</svg>`;
+}
+function renderNextUp(s) {
+  const hs = (s.hourly || []).slice(0, 3);
+  $("nextup").innerHTML = hs.length ? `<h4>Next 3 hours</h4>` + hs.map(h => {
+    const [, k] = condition(h.code, h.wind_mph);
+    const r = h.rain_pct < 0 ? 0 : h.rain_pct;
+    return `<div class="row"><span class="t">${clock(h.time)}</span>${icon(k, h.is_day)}
+      <span class="v">${deg(h.temp_f)}</span><span class="r${r >= 20 ? " wet" : ""}">💧${pct(h.rain_pct)}</span></div>`;
+  }).join("") : "";
+}
+
 function renderWeather() {
   if (!lastSnapshot) return;
   const s = view();
@@ -557,6 +645,8 @@ function renderWeather() {
   $("hl").textContent = hl(s.today_high_f, s.today_low_f);
   $("feels").textContent = d.feels_like_f != null ? `Feels like ${deg(d.feels_like_f)}` : "";
   $("condIcon").innerHTML = icon(key, s.is_day);
+  $("scene").innerHTML = scene(key, s.is_day);
+  renderNextUp(s);
   $("cond").textContent = label(l, s.is_day);
   $("nowMeta").textContent = active ? `${active.lat.toFixed(3)}, ${active.lon.toFixed(3)}` : "";
 
