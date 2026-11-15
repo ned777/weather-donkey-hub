@@ -43,6 +43,15 @@
   .c-now { grid-column: span 7; } .c-days { grid-column: span 5; }
   .c-hours { grid-column: span 12; }
   .c-days { display: flex; flex-direction: column; }
+  /* Right Now fills its height: the 8 detail boxes grow so there's no empty gap at the bottom. */
+  .c-now { display: flex; flex-direction: column; }
+  .c-now .stats { flex: 1; grid-auto-rows: 1fr; }
+  @media (min-width: 721px) {
+    .c-now .stat .v { font-size: 38px; gap: 8px; }
+    .c-now .stat .label { font-size: 14.5px; }
+    .c-now .stat .s { font-size: 15.5px; margin-top: 4px; }
+    .c-now .stat .arrow { font-size: 30px; }
+  }
   #days { flex: 1; display: flex; flex-direction: column; }
   #days .day { flex: 1; }
   .c-hist { grid-column: span 6; } .c-conv { grid-column: span 3; } .c-locs { grid-column: span 3; }
@@ -51,7 +60,7 @@
   .card-head h2 { margin: 0; color: var(--yellow); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
   .card-head .meta { color: var(--faint); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card-body { padding: 14px 16px; }
-  .label { color: var(--dim); font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; }
+  .label { color: var(--dim); font-size: 13.5px; letter-spacing: .12em; text-transform: uppercase; }
 
   /* ---------- now ---------- */
   .hero { display: grid; grid-template-columns: auto 1fr; gap: 6px 28px; align-items: center; padding: 14px 18px 10px; }
@@ -66,11 +75,12 @@
   .hl { font-size: 22px; font-weight: 700; margin: 8px 0 2px; }
   .feels { color: var(--dim); font-size: 15.5px; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); }
-  .stat { padding: 9px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0; }
+  .stat { padding: 12px 16px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0;
+    display: flex; flex-direction: column; justify-content: center; }
   .stat:nth-child(4n) { border-right: 0; }
-  .stat .v { font-size: 17px; font-weight: 700; margin-top: 2px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
-  .stat .s { color: var(--faint); font-size: 13px; margin-top: 1px; }
-  .arrow { display: inline-block; color: var(--teal); font-size: 15.5px; }
+  .stat .v { font-size: 26px; font-weight: 800; margin-top: 4px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .stat .s { color: var(--faint); font-size: 14px; margin-top: 2px; }
+  .arrow { display: inline-block; color: var(--teal); font-size: 22px; }
   .sunbar { padding: 10px 16px 4px; }
   .sunrow { display: flex; justify-content: space-between; font-size: 14.5px; font-weight: 700; }
   .sunrow span:nth-child(2) { color: var(--dim); font-weight: 400; font-size: 13.5px; }
