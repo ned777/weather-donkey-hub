@@ -49,7 +49,8 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
 
 - **Has its own web page** at http://192.168.1.5:8094: a pure-black (AMOLED)
   dashboard with current conditions (feels-like, humidity, wind direction and gusts,
-  pressure, cloud cover, UV, and a daylight bar), the 12-hour and 5-day
+  pressure, cloud cover, UV, a daylight bar, and the moon: tonight's phase and
+  % lit plus the dates of the next new, first-quarter, full and last-quarter moons), the 12-hour and 5-day
   forecasts, *What Was the Weather?*, **On This Day** (events, famous births and
   deaths, and holidays — downloaded from Wikipedia once a year and served from
   the server), the °F ⇄ °C converter (with the math worked out for your number,
@@ -147,8 +148,8 @@ HTTP is allowed only to that one address (`res/xml/network_security_config.xml`)
 The app screen uses the same card layout as the web page (pure black, teal-bordered
 cards): a one-line header with °F | °C, the location tabs, a **Right Now** card with
 source chips (Average · Open-Meteo · MET Norway · 7Timer!, each with its temperature),
-the outlined temperature beside the condition, an 8-box details grid and a sunrise/sunset
-bar, then **Next 12 Hours**, **5-Day Forecast** (with range bars), **What Was the
+the outlined temperature beside the condition, an 8-box details grid, a sunrise/sunset
+bar and the moon (tonight's phase and % lit, then the next four main phases with dates), then **Next 12 Hours**, **5-Day Forecast** (with range bars), **What Was the
 Weather?** and the converter. Tapping a source chip switches the app (and the widget)
 to that source's own forecast; Average is the default. It keeps everything the original
 had: location tabs, pull-to-refresh, the outlined temperature, °F/°C and per-widget locations. One pull-to-refresh now updates **every tab at once**
@@ -165,3 +166,15 @@ of the widget opens the app). While a pull-down refresh is working, a cyan bar a
 (or the error) for a moment. Tap the donkey or the title for the city list:
 tap to switch; long-press for sort mode (drag a city from anywhere on its row, ✕ on the right to remove
 with a confirm; ✓ saves the order, ✕ at the top cancels).
+
+## Moon phase
+
+The moon section (app and web page) is calculated on the device itself, so it
+needs no server or internet and is always current, even from cached weather. It
+uses Jean Meeus' *Astronomical Algorithms* (ch. 48–49): phase times are good to a
+minute or two, and "% lit" comes from the Sun–Moon angle. A main phase (New, First
+Quarter, Full, Last Quarter) is named on the calendar day it happens; other days
+are Waxing/Waning Crescent or Gibbous. Full moons get their traditional name
+(Wolf, Snow, Worm, Pink, Flower, Strawberry, Buck, Sturgeon, Harvest, Hunter's,
+Beaver, Cold), or *Blue Moon* for a second full moon in a month. On wide web
+windows, the night-sky scene beside the temperature shows the real phase.

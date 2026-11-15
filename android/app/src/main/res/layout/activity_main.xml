@@ -392,6 +392,13 @@
 
                 <View style="@style/Line" />
 
+                <!-- next four moon phases, 2 × 2, filled in by renderMoon() -->
+                <LinearLayout
+                    android:id="@+id/moonPhases"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

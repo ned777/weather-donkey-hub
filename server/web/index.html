@@ -119,6 +119,21 @@
     background: linear-gradient(90deg, #33E4FF99, var(--yellow)); }
   .track .dot { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--yellow);
     box-shadow: 0 0 8px var(--yellow); transform: translate(-50%, -50%); }
+  /* moon: the next four main phases under the sun bar */
+  .moonrow { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); }
+  .ph { display: grid; grid-template-columns: auto 1fr; column-gap: 9px; align-items: center; padding: 9px 12px; border-right: 1px solid var(--line); min-width: 0; }
+  .ph:last-child { border-right: 0; }
+  .ph svg { grid-row: span 3; width: 30px; height: 30px; }
+  .ph b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ph span { color: var(--white); font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .ph em { font-style: normal; color: var(--faint); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ph.full b { color: var(--yellow); }
+  .moonnow { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-top: 1px solid var(--line); margin-top: 8px; }
+  .moonnow svg { width: 52px; height: 52px; flex: 0 0 auto; }
+  .moonnow .t { flex: 1; min-width: 0; }
+  .moonnow .n { color: var(--yellow); font-size: 22px; font-weight: 800; }
+  .moonnow .s { color: var(--faint); font-size: 14px; }
+  .moonnow .p { font-size: 22px; font-weight: 800; white-space: nowrap; }
   .status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 9px 16px;
     border-top: 1px solid var(--line); font-size: 13.5px; color: var(--dim); }
   .pill { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
@@ -335,6 +350,8 @@
     .stats { grid-template-columns: repeat(2, 1fr); }
     .stat:nth-child(4n) { border-right: 1px solid var(--line); }
     .stat:nth-child(2n) { border-right: 0; }
+    .moonrow { grid-template-columns: repeat(2, 1fr); }
+    .ph:nth-child(2) { border-right: 0; } .ph:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
     .hform { grid-template-columns: 1fr 1fr; }
     .hres { grid-template-columns: 1fr; }
     .day { grid-template-columns: 48px 32px 1fr; }
@@ -381,6 +398,8 @@
         <div class="sunrow"><span id="sunrise">↑ --:--</span><span id="daylen"></span><span id="sunset">↓ --:--</span></div>
         <div class="track"><div class="fill" id="sunFill"></div><div class="dot" id="sunDot"></div></div>
       </div>
+      <div class="moonnow" id="moonNow"></div>
+      <div class="moonrow" id="moonPhases" aria-label="Next moon phases"></div>
       <div class="status">
         <span id="updated">Loading…</span>
         <span id="pills"></span>
@@ -653,6 +672,83 @@ async function loadWeather(fresh = false) {
   }
 }
 
+// ---- moon phase (Meeus, Astronomical Algorithms ch. 48–49; good to a minute or two) ----
+const MOON = (() => {
+  const R = Math.PI / 180, sin = d => Math.sin(d * R), cos = d => Math.cos(d * R);
+  const jdOf = t => t / 86400000 + 2440587.5, timeOf = jd => (jd - 2440587.5) * 86400000;
+  // q: 0 new, 1 first quarter, 2 full, 3 last quarter of lunation k (k = 0 → Jan 6, 2000)
+  function phaseTime(k, q) {
+    k += q / 4;
+    const T = k / 1236.85, E = 1 - 0.002516 * T - 0.0000074 * T * T;
+    const M = 2.5534 + 29.1053567 * k - 0.0000014 * T * T;
+    const Mp = 201.5643 + 385.81693528 * k + 0.0107582 * T * T + 0.00001238 * T ** 3;
+    const F = 160.7108 + 390.67050284 * k - 0.0016118 * T * T - 0.00000227 * T ** 3;
+    const O = 124.7746 - 1.56375588 * k + 0.0020672 * T * T;
+    let jd = 2451550.09766 + 29.530588861 * k + 0.00015437 * T * T - 0.00000015 * T ** 3;
+    if (q === 0 || q === 2) {
+      const n = q === 0;
+      jd += (n ? -0.4072 : -0.40614) * sin(Mp) + (n ? 0.17241 : 0.17302) * E * sin(M) + (n ? 0.01608 : 0.01614) * sin(2 * Mp)
+        + (n ? 0.01039 : 0.01043) * sin(2 * F) + (n ? 0.00739 : 0.00734) * E * sin(Mp - M) - (n ? 0.00514 : 0.00515) * E * sin(Mp + M)
+        + (n ? 0.00208 : 0.00209) * E * E * sin(2 * M) - 0.00111 * sin(Mp - 2 * F) - 0.00057 * sin(Mp + 2 * F)
+        + 0.00056 * E * sin(2 * Mp + M) - 0.00042 * sin(3 * Mp) + 0.00042 * E * sin(M + 2 * F) + 0.00038 * E * sin(M - 2 * F)
+        - 0.00024 * E * sin(2 * Mp - M) - 0.00017 * sin(O);
+    } else {
+      jd += -0.62801 * sin(Mp) + 0.17172 * E * sin(M) - 0.01183 * E * sin(Mp + M) + 0.00862 * sin(2 * Mp) + 0.00804 * sin(2 * F)
+        + 0.00454 * E * sin(Mp - M) + 0.00204 * E * E * sin(2 * M) - 0.0018 * sin(Mp - 2 * F) - 0.0007 * sin(Mp + 2 * F)
+        - 0.0004 * sin(3 * Mp) - 0.00034 * E * sin(2 * Mp - M) + 0.00032 * E * sin(M + 2 * F) + 0.00032 * E * sin(M - 2 * F)
+        - 0.00028 * E * E * sin(Mp + 2 * M) + 0.00027 * E * sin(2 * Mp + M) - 0.00017 * sin(O);
+      const W = 0.00306 - 0.00038 * E * cos(M) + 0.00026 * cos(Mp) - 0.00002 * cos(Mp - M) + 0.00002 * cos(Mp + M) + 0.00002 * cos(2 * F);
+      jd += q === 1 ? W : -W;
+    }
+    return new Date(timeOf(jd - 69 / 86400)); // TT → UTC
+  }
+  // Fraction lit and whether it's growing, right now.
+  function illum(date) {
+    const T = (jdOf(+date) - 2451545) / 36525;
+    const D = 297.8501921 + 445267.1114034 * T, M = 357.5291092 + 35999.0502909 * T, Mp = 134.9633964 + 477198.8675055 * T;
+    const i = 180 - D - 6.289 * sin(Mp) + 2.1 * sin(M) - 1.274 * sin(2 * D - Mp) - 0.658 * sin(2 * D) - 0.214 * sin(2 * Mp) - 0.11 * sin(D);
+    return { lit: (1 + cos(i)) / 2, waxing: ((D % 360) + 360) % 360 < 180 };
+  }
+  const NAMES = ["New Moon", "First Quarter", "Full Moon", "Last Quarter"];
+  const BETWEEN = ["Waxing Crescent", "Waxing Gibbous", "Waning Gibbous", "Waning Crescent"];
+  const FULL_NAMES = ["Wolf", "Snow", "Worm", "Pink", "Flower", "Strawberry", "Buck", "Sturgeon", "Harvest", "Hunter's", "Beaver", "Cold"];
+  const dayKey = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  // Everything the page shows: today's phase, % lit, age, and the next four main phases.
+  function info(now = new Date()) {
+    const k0 = Math.floor((jdOf(+now) - 2451550.09766) / 29.530588861) - 1;
+    const events = [];
+    for (let k = k0; k < k0 + 4; k++) for (let q = 0; q < 4; q++) events.push({ q, k, time: phaseTime(k, q) });
+    events.sort((a, b) => a.time - b.time);
+    const today = dayKey(now);
+    const todayEv = events.find(e => dayKey(e.time) === today);
+    const prev = events.filter(e => e.time <= now).pop();
+    const lastNew = events.filter(e => e.q === 0 && e.time <= now).pop();
+    const upcoming = events.filter(e => e.time > now && e !== todayEv).slice(0, 4);
+    const { lit, waxing } = illum(now);
+    const named = e => e.q !== 2 ? NAMES[e.q] : `${FULL_NAMES[e.time.getMonth()]} Moon`;
+    // second full moon in one calendar month is a "Blue Moon"
+    const blue = e => e.q === 2 && events.some(o => o.q === 2 && o.time < e.time && o.time.getMonth() === e.time.getMonth() && o.time.getFullYear() === e.time.getFullYear());
+    return {
+      name: todayEv ? NAMES[todayEv.q] : BETWEEN[prev.q],
+      lit, waxing, age: lastNew ? (now - lastNew.time) / 86400000 : null,
+      fullName: todayEv?.q === 2 ? (blue(todayEv) ? "Blue Moon" : named(todayEv)) : null,
+      upcoming: upcoming.map(e => ({ name: NAMES[e.q], q: e.q, time: e.time, nick: e.q === 2 ? (blue(e) ? "Blue Moon" : named(e)) : null })),
+    };
+  }
+  // A moon drawn with its real shadow: lit side on the right while waxing (northern sky).
+  function shape(cx, cy, r, lit, waxing, dark = "#24243A") {
+    const rx = Math.abs(1 - 2 * lit) * r, right = waxing;
+    const outer = right ? 1 : 0, term = right === lit < 0.5 ? 0 : 1;
+    const f = n => +n.toFixed(2);
+    const litPart = lit < 0.005 ? "" : lit > 0.995 ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#F5F5FF"/>`
+      : `<path d="M${cx} ${f(cy - r)} A${r} ${r} 0 0 ${outer} ${cx} ${f(cy + r)} A${f(rx)} ${r} 0 0 ${term} ${cx} ${f(cy - r)}Z" fill="#F5F5FF"/>`;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${dark}" stroke="#4A4A66" stroke-width="${f(r / 23)}"/>${litPart}`;
+  }
+  const svg = (lit, waxing, size) => `<svg class="moon" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${shape(50, 50, 46, lit, waxing)}</svg>`;
+  const iconFor = q => svg([0, 0.5, 1, 0.5][q], q < 2, 26);
+  return { info, svg, shape, iconFor };
+})();
+
 function stat(lbl, value, sub = "") {
   return `<div class="stat"><div class="label">${lbl}</div><div class="v">${value}</div><div class="s">${sub}</div></div>`;
 }
@@ -687,9 +783,8 @@ function sunSvg(cx, cy, r) {
 function moonSvg(cx, cy, r) {
   const stars = [[18, 22, 0], [100, 16, .8], [108, 70, 1.6], [22, 92, 2.2], [70, 8, 1.2], [92, 104, .4]]
     .map(([x, y, d]) => `<circle class="tw" cx="${x}" cy="${y}" r="2.2" fill="#F5F5FF" style="animation-delay:${d}s"/>`).join("");
-  return `${stars}<g class="float" style="filter: drop-shadow(0 0 10px rgba(245,245,255,.45))">
-    <mask id="wdm"><rect width="120" height="120" fill="#fff"/><circle cx="${cx + r * .55}" cy="${cy - r * .35}" r="${r * .9}" fill="#000"/></mask>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#F5F5FF" mask="url(#wdm)"/></g>`;
+  const m = MOON.info(); // tonight's real phase, not a stock crescent
+  return `${stars}<g class="float" style="filter: drop-shadow(0 0 10px rgba(245,245,255,.45))">${MOON.shape(cx, cy, r, m.lit, m.waxing, "#1A1A2C")}</g>`;
 }
 function scene(key, isDay) {
   const sky = isDay ? sunSvg(60, 56, 24) : moonSvg(58, 58, 28);
@@ -726,6 +821,7 @@ function renderWeather() {
   $("cond").textContent = label(l, s.is_day);
   $("nowMeta").textContent = active ? `${active.lat.toFixed(3)}, ${active.lon.toFixed(3)}` : "";
 
+  const moon = MOON.info();
   const arrow = d.wind_dir != null ? `<span class="arrow" style="transform:rotate(${d.wind_dir + 180}deg)">↑</span>` : "";
   $("stats").innerHTML = [
     stat("Rain chance", pct(s.today_rain_pct), "today"),
@@ -738,6 +834,7 @@ function renderWeather() {
     stat("UV index", d.uv != null ? d.uv.toFixed(1) : "--", d.uv_max != null ? `max today ${d.uv_max.toFixed(1)}` : ""),
     stat("Feels like", d.feels_like_f != null ? deg(d.feels_like_f) : "--", "apparent"),
   ].join("");
+  renderMoonPhases(moon);
 
   $("sunrise").textContent = `↑ Sunrise ${clock(s.sunrise)}`;
   $("sunset").textContent = `↓ Sunset ${clock(s.sunset)}`;
@@ -768,6 +865,24 @@ function renderWeather() {
   renderDays(s);
   renderHours(s);
   $("histMeta").textContent = active ? shortName(active) : "";
+}
+
+function renderMoonPhases(m) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const full = m.upcoming.find(e => e.q === 2);
+  const fullIn = full ? Math.round((new Date(full.time).setHours(0, 0, 0, 0) - today) / 86400000) : null;
+  $("moonNow").innerHTML = `${MOON.svg(m.lit, m.waxing, 52)}<div class="t"><div class="label">Moon tonight</div>
+    <div class="n">${esc(m.fullName ? `Full Moon · ${m.fullName}` : m.name)}</div>
+    <div class="s">${full ? `Full moon ${fullIn === 1 ? "tomorrow" : `in ${fullIn} days`} (${esc(full.nick)})` : ""}</div></div>
+    <div class="p">${Math.round(m.lit * 100)}% lit</div>`;
+  $("moonPhases").innerHTML = m.upcoming.map(e => {
+    const day = new Date(e.time); day.setHours(0, 0, 0, 0);
+    const n = Math.round((day - today) / 86400000);
+    const when = n === 1 ? "tomorrow" : `in ${n} days`;
+    const date = e.time.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+    return `<div class="ph${e.q === 2 ? " full" : ""}" title="${esc(e.nick ? `${e.name} (${e.nick})` : e.name)} · ${esc(e.time.toLocaleString())}">${MOON.iconFor(e.q)}
+      <b>${esc(e.name)}</b><span>${esc(date)}</span><em>${when} · ${e.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}</em></div>`;
+  }).join("");
 }
 
 const uvLevel = u => u < 3 ? 0 : u < 6 ? 1 : u < 8 ? 2 : 3;

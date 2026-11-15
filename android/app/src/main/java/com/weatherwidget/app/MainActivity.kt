@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var conditionIcon: ImageView
     private lateinit var conditionText: TextView
     private lateinit var sunriseText: TextView
+    private lateinit var moonPhases: LinearLayout
     private lateinit var sunsetText: TextView
     private lateinit var updatedText: TextView
     private lateinit var refreshBanner: View
@@ -239,6 +240,7 @@ class MainActivity : AppCompatActivity() {
         conditionIcon = findViewById(R.id.conditionIcon)
         conditionText = findViewById(R.id.conditionText)
         sunriseText = findViewById(R.id.sunriseText)
+        moonPhases = findViewById(R.id.moonPhases)
         sunsetText = findViewById(R.id.sunsetText)
         updatedText = findViewById(R.id.updatedText)
         refreshBanner = findViewById(R.id.refreshBanner)
@@ -1135,6 +1137,7 @@ class MainActivity : AppCompatActivity() {
         val fahrenheit = UnitPreference.isFahrenheit(this)
         val d = snapshot?.details ?: WeatherDetails()
         val dir = d.windDir
+        val moon = MoonPhase.info()
         val boxes = listOf(
             Triple("Rain chance", snapshot?.let { WeatherFormat.rainPct(it.todayRainChancePercent) } ?: "--", "today"),
             Triple("Wind", snapshot?.let { WeatherFormat.mph(it.windSpeedMph) } ?: "--",
@@ -1163,6 +1166,119 @@ class MainActivity : AppCompatActivity() {
                 row.addView(statBox(label, value, sub, label == "Wind" && dir != null, dir ?: 0.0))
             }
             statsGrid.addView(row)
+        }
+        renderMoon(moon)
+    }
+
+    // ---- moon: tonight's phase, then the next four main phases (2 × 2), under the sunrise bar
+
+    private fun renderMoon(moon: MoonPhase.Info) {
+        moonPhases.removeAllViews()
+        val dp = resources.displayMetrics.density
+        val lineColor = ContextCompat.getColor(this, R.color.app_line)
+        val today = LocalDate.now()
+        val dateFmt = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
+        val timeFmt = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
+        moonPhases.addView(View(this).apply {
+            setBackgroundColor(lineColor)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (1 * dp).toInt())
+        })
+        val head = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding((12 * dp).toInt(), (9 * dp).toInt(), (12 * dp).toInt(), (9 * dp).toInt())
+        }
+        head.addView(MoonView(this).apply {
+            lit = moon.lit; waxing = moon.waxing
+            layoutParams = LinearLayout.LayoutParams((44 * dp).toInt(), (44 * dp).toInt())
+                .apply { marginEnd = (12 * dp).toInt() }
+        })
+        val headText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        headText.addView(TextView(this).apply {
+            text = "MOON TONIGHT"
+            textSize = 10.5f
+            letterSpacing = 0.1f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_dim))
+        })
+        headText.addView(TextView(this).apply {
+            text = moon.fullName?.let { "Full Moon · $it" } ?: moon.name
+            textSize = 17f
+            setTypeface(typeface, Typeface.BOLD)
+            maxLines = 1
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.retro_yellow))
+        })
+        moon.upcoming.firstOrNull { it.quarter == 2 }?.let { full ->
+            val n = java.time.temporal.ChronoUnit.DAYS.between(today, full.time.toLocalDate())
+            headText.addView(TextView(this).apply {
+                text = "Full moon " + (if (n == 1L) "tomorrow" else "in $n days") +
+                    (full.nickname?.let { " ($it)" } ?: "")
+                textSize = 11.5f
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_faint))
+            })
+        }
+        head.addView(headText)
+        head.addView(TextView(this).apply {
+            text = "${Math.round(moon.lit * 100)}% lit"
+            textSize = 17f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.white))
+        })
+        moonPhases.addView(head)
+        moon.upcoming.chunked(2).forEach { pair ->
+            moonPhases.addView(View(this).apply {
+                setBackgroundColor(lineColor)
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (1 * dp).toInt())
+            })
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            pair.forEachIndexed { i, e ->
+                if (i == 1) row.addView(View(this).apply {
+                    setBackgroundColor(lineColor)
+                    layoutParams = LinearLayout.LayoutParams((1 * dp).toInt(), ViewGroup.LayoutParams.MATCH_PARENT)
+                })
+                val days = java.time.temporal.ChronoUnit.DAYS.between(today, e.time.toLocalDate())
+                val box = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding((12 * dp).toInt(), (7 * dp).toInt(), (8 * dp).toInt(), (7 * dp).toInt())
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                val (lit, waxing) = MoonPhase.iconFor(e.quarter)
+                box.addView(MoonView(this).apply {
+                    this.lit = lit; this.waxing = waxing
+                    layoutParams = LinearLayout.LayoutParams((26 * dp).toInt(), (26 * dp).toInt())
+                        .apply { marginEnd = (9 * dp).toInt() }
+                })
+                val text = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                text.addView(TextView(this).apply {
+                    this.text = e.name
+                    textSize = 12.5f
+                    setTypeface(typeface, Typeface.BOLD)
+                    maxLines = 1
+                    setTextColor(ContextCompat.getColor(this@MainActivity,
+                        if (e.quarter == 2) R.color.retro_yellow else R.color.white))
+                })
+                text.addView(TextView(this).apply {
+                    this.text = e.time.format(dateFmt)
+                    textSize = 12.5f
+                    setTypeface(typeface, Typeface.BOLD)
+                    maxLines = 1
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.white))
+                })
+                text.addView(TextView(this).apply {
+                    this.text = (if (days == 1L) "tomorrow" else "in $days days") + " · " +
+                        e.time.format(timeFmt)
+                    textSize = 11f
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_faint))
+                })
+                box.addView(text)
+                row.addView(box)
+            }
+            moonPhases.addView(row)
         }
     }
 
