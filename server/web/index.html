@@ -87,9 +87,10 @@
   .pill.down { color: #ff9a9a; }
   .notice { color: var(--yellow); }
   .error { color: var(--yellow); }
-  .refresh { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 8px;
-    padding: 4px 12px; cursor: pointer; }
-  .refresh:hover { color: var(--white); border-color: var(--dim); }
+  .refresh { margin: 0 auto 0 14px; background: #000; border: 2px solid #FFFFFF; color: #FFFFFF; border-radius: 8px;
+    padding: 3px 12px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
+  .refresh:hover { background: #FFFFFF; color: #000; }
+  .refresh:disabled { opacity: .6; cursor: default; }
 
   /* ---------- source picker ---------- */
   .srcpick { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
@@ -277,7 +278,7 @@
   <div class="grid">
     <!-- NOW -->
     <section class="card c-now">
-      <div class="card-head"><h2>Right Now</h2><span class="meta" id="nowMeta"></span></div>
+      <div class="card-head"><h2>Right Now</h2><button class="refresh" id="refresh">↻ Refresh</button><span class="meta" id="nowMeta"></span></div>
       <div class="srcpick" id="srcpick" role="group" aria-label="Weather source"></div>
       <div class="hero">
         <div class="left">
@@ -300,7 +301,6 @@
         <span id="updated">Loading…</span>
         <span id="pills"></span>
         <span class="notice" id="notice" hidden></span>
-        <button class="refresh" id="refresh">↻ Refresh</button>
       </div>
     </section>
 
