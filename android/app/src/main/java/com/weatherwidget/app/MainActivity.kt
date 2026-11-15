@@ -573,7 +573,7 @@ class MainActivity : AppCompatActivity() {
         renderDrawer()
     }
 
-    private inner class DrawerHolder(val row: LinearLayout, val city: TextView, val region: TextView, val action: TextView) :
+    private inner class DrawerHolder(val row: LinearLayout, val handle: TextView, val city: TextView, val region: TextView, val action: TextView) :
         androidx.recyclerview.widget.RecyclerView.ViewHolder(row)
 
     private inner class DrawerAdapter : androidx.recyclerview.widget.RecyclerView.Adapter<DrawerHolder>() {
@@ -591,6 +591,15 @@ class MainActivity : AppCompatActivity() {
                 layoutParams = androidx.recyclerview.widget.RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             }
+            // ≡ drag handle before the name — only in sort mode.
+            val handle = TextView(this@MainActivity).apply {
+                text = "≡"
+                textSize = 24f
+                gravity = android.view.Gravity.CENTER
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.retro_cyan))
+                contentDescription = "Drag to move"
+            }
+            row.addView(handle, LinearLayout.LayoutParams(dp(40), dp(48)))
             // City on one line (shrinks to fit, never wraps), region/country smaller underneath.
             val names = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -615,7 +624,7 @@ class MainActivity : AppCompatActivity() {
                 setBackgroundResource(android.R.drawable.list_selector_background)
             }
             row.addView(action, LinearLayout.LayoutParams(dp(48), dp(48)))
-            return DrawerHolder(row, city, region, action)
+            return DrawerHolder(row, handle, city, region, action)
         }
 
         @android.annotation.SuppressLint("ClickableViewAccessibility")
@@ -644,29 +653,25 @@ class MainActivity : AppCompatActivity() {
                 setSorting(true)
                 true
             }
-            holder.action.setOnTouchListener(null)
-            holder.action.setOnClickListener(null)
-            when {
-                isCurrent -> holder.action.text = ""
-                sorting -> {
-                    // ≡ drag handle: touching it picks the row up straight away.
-                    holder.action.text = "≡"
-                    holder.action.textSize = 24f
-                    holder.action.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.retro_cyan))
-                    holder.action.contentDescription = "Drag to move"
-                    holder.action.setOnTouchListener { _, ev ->
-                        if (ev.actionMasked == MotionEvent.ACTION_DOWN) dragHelper.startDrag(holder)
-                        false
-                    }
-                }
-                else -> {
-                    holder.action.text = "✕"
-                    holder.action.textSize = 18f
-                    holder.action.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_down))
-                    holder.action.contentDescription = getString(R.string.remove)
-                    holder.action.setOnClickListener { confirmRemoveLocation(id, name) }
-                }
+            // Normal mode: just the name. Sort mode: ≡ on the left to drag, ✕ on the right to remove.
+            val density = resources.displayMetrics.density
+            val showControls = sorting && !isCurrent
+            holder.row.setPaddingRelative(((if (sorting) 6 else 18) * density).toInt(), 0, (6 * density).toInt(), 0)
+            holder.handle.visibility = when {
+                showControls -> View.VISIBLE
+                sorting -> View.INVISIBLE // keeps Current's name lined up with the others
+                else -> View.GONE
             }
+            holder.handle.setOnTouchListener(if (!showControls) null else View.OnTouchListener { _, ev ->
+                if (ev.actionMasked == MotionEvent.ACTION_DOWN) dragHelper.startDrag(holder)
+                false
+            })
+            holder.action.visibility = if (showControls) View.VISIBLE else View.GONE
+            holder.action.text = "✕"
+            holder.action.textSize = 18f
+            holder.action.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_down))
+            holder.action.contentDescription = getString(R.string.remove)
+            holder.action.setOnClickListener { confirmRemoveLocation(id, name) }
         }
     }
 
@@ -686,7 +691,13 @@ class MainActivity : AppCompatActivity() {
                 savedLocations = LocationStore.list(this)
                 if (activeLocationId == id) activeLocationId = WeatherCache.CURRENT_LOCATION_ID
                 rebuildTabs()
-                renderDrawer()
+                if (sorting) {
+                    // Keep the order being arranged; just take this city out of it.
+                    val at = drawerItems.indexOfFirst { it.first == id }
+                    if (at >= 0) { drawerItems.removeAt(at); drawerAdapter.notifyItemRemoved(at) }
+                } else {
+                    renderDrawer()
+                }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()

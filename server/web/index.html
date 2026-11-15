@@ -579,8 +579,8 @@ function renderWeather() {
   $("updated").textContent = "Updated " + when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) +
     " · next " + hm(nextSlot());
   const rec = active?.id === "home"
-    ? '<span class="pill"><i></i>Recorded every 2 h</span>'
-    : '<span class="pill" title="Only Home is recorded; history for this city comes from the archive"><i style="background:#9A9AB0"></i>Live only</span>';
+    ? '<span class="pill"><i></i>Updated &amp; recorded every 3 h</span>'
+    : '<span class="pill" title="Only Home is recorded; history for this city comes from the archive"><i style="background:#9A9AB0"></i>Updated every 3 h · not recorded</span>';
   $("pills").innerHTML = rec + ` <span class="pill" title="Where these numbers come from"><i style="background:var(--cyan)"></i>${esc(s.source_label || "")}</span>`;
   const picked = sourceSel !== "average" && s === lastSnapshot
     ? `${SOURCE_NAMES[sourceSel] || sourceSel} is unavailable right now — showing the average` : null;
