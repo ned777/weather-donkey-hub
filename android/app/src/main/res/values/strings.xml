@@ -46,4 +46,6 @@
     <string name="history_whole_day">Whole day</string>
     <string name="history_looking">Asking the server…</string>
     <string name="history_need_location">Load this tab\'s weather once first, so the server knows where to look</string>
+    <string name="auto_refresh_on">↻ Refresh when app opens: On</string>
+    <string name="auto_refresh_off">↻ Refresh when app opens: Off</string>
 </resources>

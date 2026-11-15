@@ -16,9 +16,10 @@ that:
   A source that's down is skipped with a small yellow note such as
   *"Open-Meteo unavailable — averaging MET Norway & 7Timer!"*. A stuck connection
   is dropped after 4 s and retried twice. A request fails only if all three are down.
-- **Refreshes every 3 hours on the clock (12, 3, 6, 9).** Opening the web page or app
-  never fetches; it shows the latest scheduled snapshot. ↻ Refresh, pull-down and a widget tap
-  fetch right away without moving the schedule.
+- **Server refreshes every 3 hours on the clock (12, 3, 6, 9).** Opening the web page
+  never fetches; it shows the latest scheduled snapshot. ↻ Refresh fetches right away without
+  moving the schedule. The phone has no timer: it refreshes on app open (optional, on by
+  default), pull-down, or a widget tap.
 - **Records the weather for its own location only.** Home is where
   this computer is, and it's recorded from every source that answers into a local SQLite
   database. Saved cities and the phone's **Current** (GPS) tab show live
@@ -147,7 +148,6 @@ an app tab, since it would duplicate Current. It adds a **What Was the Weather?*
 date and either a time or "Whole day", tap **Look Up**, and it shows the answer
 for whichever tab is open.
 
-Opening the app never fetches. Every 3 hours on the clock (12, 3, 6, 9) a phone
-alarm picks up the server's scheduled snapshot for every tab and repaints the
-widgets. Pull down or tap the widget to fetch right now; that never moves the
-schedule. A missed slot (phone off) is caught up the next time the app opens.
+There's no background timer on the phone. Weather refreshes when you open the
+app (**↻ Refresh when app opens**, on by default, tap to turn off), pull down,
+or tap the widget.

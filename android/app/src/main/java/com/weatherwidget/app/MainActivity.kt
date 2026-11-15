@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity() {
     // avoids needing every one of these to be nullable (`SwipeRefreshLayout?`) just to
     // cover the brief moment before onCreate() has run.
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var autoRefreshToggle: TextView
     private lateinit var tabLayout: TabLayout
     private lateinit var fahrenheitButton: TextView
     private lateinit var celsiusButton: TextView
@@ -267,37 +268,34 @@ class MainActivity : AppCompatActivity() {
         setupTabs()
         updateUnitButtonsUi()
         renderFromCache()
-    }
 
-    // Opening the app never fetches. It only catches up when a scheduled 3-hour refresh
-    // was missed (phone off, no Wi-Fi at the time), and repaints when the next one lands
-    // while the app is open. Both use the server's scheduled snapshot, not a new fetch.
-    private val slotHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val slotTick = Runnable { catchUpWithSchedule() }
-
-    override fun onResume() {
-        super.onResume()
-        ScheduledRefresh.schedule(this)
-        catchUpWithSchedule()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        slotHandler.removeCallbacks(slotTick)
-    }
-
-    private fun catchUpWithSchedule() {
-        slotHandler.removeCallbacks(slotTick)
-        val wait = ScheduledRefresh.nextSlotMillis() + 90_000L - System.currentTimeMillis()
-        slotHandler.postDelayed(slotTick, wait.coerceAtLeast(5_000L))
-        if (!ScheduledRefresh.isBehind(this)) {
-            renderFromCache()
-            return
+        autoRefreshToggle = findViewById(R.id.autoRefreshToggle)
+        updateAutoRefreshUi()
+        autoRefreshToggle.setOnClickListener {
+            AutoRefreshPreference.set(this, !AutoRefreshPreference.isOn(this))
+            updateAutoRefreshUi()
         }
-        Thread {
-            ScheduledRefresh.runBlocking(applicationContext)
-            runOnUiThread { if (!isFinishing) renderFromCache() }
-        }.start()
+        if (savedInstanceState == null) autoRefreshOnOpen()
+    }
+
+    // Opening the app (fresh start, or coming back from the home screen) refreshes every
+    // tab when "Refresh when app opens" is on; otherwise it just shows the last update.
+    override fun onRestart() {
+        super.onRestart()
+        autoRefreshOnOpen()
+    }
+
+    private fun updateAutoRefreshUi() {
+        val on = AutoRefreshPreference.isOn(this)
+        autoRefreshToggle.text = getString(if (on) R.string.auto_refresh_on else R.string.auto_refresh_off)
+        autoRefreshToggle.setTextColor(ContextCompat.getColor(this, if (on) R.color.retro_cyan else R.color.app_dim))
+    }
+
+    // Never pops the location permission dialog on its own — that stays behind a tap.
+    private fun autoRefreshOnOpen() {
+        if (!AutoRefreshPreference.isOn(this)) return
+        if (activeLocationId == WeatherCache.CURRENT_LOCATION_ID && !LocationHelper.hasPermission(this)) return
+        if (!swipeRefresh.isRefreshing) startRefresh()
     }
 
     // Observes every touch the Activity sees (without consuming it — normal scrolling,
@@ -521,9 +519,7 @@ class MainActivity : AppCompatActivity() {
             val snapshot = full.forSource(picked)
             renderSourceChips(full, picked)
             render(snapshot)
-            val next = java.time.Instant.ofEpochMilli(ScheduledRefresh.nextSlotMillis()).atZone(java.time.ZoneId.systemDefault())
-                .format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
-            updatedText.text = "Updated " + WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt) + " · next " + next
+            updatedText.text = "Updated " + WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt)
             sourceLabelText.text = snapshot.sourceLabel
             sourceLabelText.visibility = if (snapshot.sourceLabel.isEmpty()) View.GONE else View.VISIBLE
             val pickedMissing = picked != SourcePreference.AVERAGE && full.bySource.isNotEmpty() && picked !in full.bySource

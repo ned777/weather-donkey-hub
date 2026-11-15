@@ -26,9 +26,8 @@ import kotlin.math.roundToInt
 private enum class WidgetSizeTier { COMPACT, FULL }
 
 /**
- * The widget's brain. A tap fetches fresh weather (onReceive() below); the
- * only other update is the 3-hour schedule in ScheduledRefresh.kt, which
- * repaints every widget after it runs. onUpdate() and onAppWidgetOptionsChanged() (called on
+ * The widget's brain. A tap fetches fresh weather (onReceive() below). It also
+ * repaints whenever the app refreshes (launch or pull-down); there is no timer. onUpdate() and onAppWidgetOptionsChanged() (called on
  * first placement, reboot, and resize) only ever repaint from whatever is
  * already cached.
  */
@@ -478,7 +477,6 @@ class WeatherWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        ScheduledRefresh.schedule(context)
         appWidgetIds.forEach { renderFromCache(context, appWidgetManager, it) }
     }
 
