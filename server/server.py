@@ -74,6 +74,17 @@ HOURLY_COUNT = 12          # the app's "Next 12 Hours" strip
 FORECAST_DAYS = 5          # the app's "5-Day Forecast" list (after today)
 HTTP_TIMEOUT_S = 4         # a stuck connection is dropped after 4 s…
 RETRY_DELAYS_S = (0.5, 1.5)  # …and tried again twice; all sources run in parallel
+# Open-Meteo's server answers in ~0.2 s but now and then stalls mid TLS handshake
+# (about 1 connection in 5, sometimes for a few minutes). So it gets short attempts
+# and more of them: a stall is dropped fast and a fresh connection usually works.
+OPEN_METEO_TIMEOUT_S = 2.5
+OPEN_METEO_RETRY_DELAYS_S = (0.2, 0.5, 1.0, 1.5)
+# When a source still fails, its last good answer for that place (if younger than
+# this) is used instead, so a blip never shows as "unavailable".
+STALE_SOURCE_OK_S = 3 * 3600  # one schedule slot
+# After a scheduled run, places where a source failed are tried again after these
+# delays so Home's 3-hourly recording isn't lost to a short outage.
+SCHEDULED_RETRY_DELAYS_S = (120, 300, 600)
 # The schedule: every 3 hours on the clock (12, 3, 6, 9 …) the server fetches fresh
 # weather for Home (recorded) and every place someone looked at recently (cached).
 # Opening the page or app only reads that cache; a manual refresh fetches now but
@@ -344,14 +355,14 @@ def purge_old_records():
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
-def http_get_json(url):
+def http_get_json(url, timeout=HTTP_TIMEOUT_S, retry_delays=RETRY_DELAYS_S):
     last_error = None
-    for attempt in range(len(RETRY_DELAYS_S) + 1):
+    for attempt in range(len(retry_delays) + 1):
         if attempt:
-            time.sleep(RETRY_DELAYS_S[attempt - 1])
+            time.sleep(retry_delays[attempt - 1])
         try:
             req = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-            with urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
+            with urlopen(req, timeout=timeout) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception as e:  # network, HTTP error, bad JSON — all "try again"
             last_error = e
@@ -417,11 +428,12 @@ def fetch_open_meteo(lat, lon):
                  "precipitation_sum,wind_gusts_10m_max,apparent_temperature_max,apparent_temperature_min",
         "hourly": "temperature_2m,weather_code,is_day,wind_speed_10m,precipitation_probability",
         "forecast_days": FORECAST_DAYS + 1,
-        "forecast_hours": HOURLY_COUNT + 2,
+        "forecast_hours": HOURLY_COUNT + 5,  # spare hours so a reused answer still fills 12
         "temperature_unit": "fahrenheit", "wind_speed_unit": "mph", "precipitation_unit": "inch",
         "timezone": "auto",
     }
-    j = http_get_json("https://api.open-meteo.com/v1/forecast?" + urlencode(params))
+    j = http_get_json("https://api.open-meteo.com/v1/forecast?" + urlencode(params),
+                      OPEN_METEO_TIMEOUT_S, OPEN_METEO_RETRY_DELAYS_S)
     c, d, h = j["current"], j["daily"], j["hourly"]
     current = {
         "time": c["time"], "temp_f": float(c["temperature_2m"]),
@@ -438,7 +450,7 @@ def fetch_open_meteo(lat, lon):
             "uv_max": (d.get("uv_index_max") or [None])[0],
         },
     }
-    hourly = [
+    hourly_all = [
         {
             "time": h["time"][i], "temp_f": h["temperature_2m"][i],
             "code": h["weather_code"][i], "is_day": h["is_day"][i] == 1,
@@ -446,7 +458,8 @@ def fetch_open_meteo(lat, lon):
             "rain_pct": _int_or(h["precipitation_probability"][i], -1),
         }
         for i in range(len(h["time"])) if h["time"][i] > c["time"]
-    ][:HOURLY_COUNT]
+    ]
+    hourly = hourly_all[:HOURLY_COUNT]
     days = [
         {
             "date": d["time"][i], "high_f": d["temperature_2m_max"][i],
@@ -463,7 +476,7 @@ def fetch_open_meteo(lat, lon):
         for i in range(len(d["time"]))
     ]
     return {"source": SOURCE_OPEN_METEO, "tz": j.get("timezone"),
-            "current": current, "hourly": hourly, "days": days}
+            "current": current, "hourly": hourly, "days": days, "hourly_all": hourly_all}
 
 
 def _day_value(daily, key, i):
@@ -1258,6 +1271,21 @@ def _save_live_cache():
     os.replace(tmp, LIVE_CACHE_PATH)
 
 
+def _reuse_stale(source, saved, lon):
+    """A source's last good answer, trimmed to "from now on" in its own time zone.
+    None when it's too old or nothing of it is still in the future."""
+    if not saved or time.time() - saved.get("t", 0) > STALE_SOURCE_OK_S:
+        return None
+    data = json.loads(json.dumps(saved["data"]))  # deep copy
+    now = datetime.now(zone_for(data.get("tz"), lon)).strftime("%Y-%m-%dT%H:%M")
+    future = [h for h in (data.get("hourly_all") or data["hourly"]) if h["time"] > now]
+    days = [d for d in data["days"] if d["date"] >= now[:10]]
+    if not future or not days:
+        return None
+    data["hourly"], data["days"] = future[:HOURLY_COUNT], days
+    return data
+
+
 def live_weather(loc_id, lat, lon, name, fresh=False, scheduled=False):
     """
     The weather for one place. Returns the cached snapshot from the current 3-hour
@@ -1277,6 +1305,17 @@ def live_weather(loc_id, lat, lon, name, fresh=False, scheduled=False):
             resp = dict(entry["resp"])
         else:
             results, statuses = fetch_and_record(loc_id, lat, lon, loc_id == HOME_ID)
+            saved = dict((entry or {}).get("src") or {})
+            failed = [s for s in SOURCE_PRIORITY if s not in results]  # retried by the schedule
+            for source in SOURCE_PRIORITY:
+                if source in results:
+                    saved[source] = {"t": time.time(), "data": results[source]}
+                    continue
+                stale = _reuse_stale(source, saved.get(source), lon)
+                if stale:  # shown, not recorded — the recordings stay first-hand
+                    results[source], statuses[source] = stale, "ok"
+                    log.info("%s: using %s's answer from %d min ago", key, source,
+                             (time.time() - saved[source]["t"]) // 60)
             if not results:
                 if entry and not fresh:
                     return dict(entry["resp"]), None  # better an older snapshot than nothing
@@ -1285,7 +1324,8 @@ def live_weather(loc_id, lat, lon, name, fresh=False, scheduled=False):
             with _live_lock:
                 asked = entry.get("asked", 0) if (entry and scheduled) else time.time()
                 _live[key] = {"t": time.time(), "asked": asked, "id": loc_id,
-                              "lat": lat, "lon": lon, "name": name, "resp": resp}
+                              "lat": lat, "lon": lon, "name": name, "resp": resp,
+                              "src": saved, "failed": failed}
             try:
                 _save_live_cache()
             except OSError:
@@ -1293,6 +1333,23 @@ def live_weather(loc_id, lat, lon, name, fresh=False, scheduled=False):
     if name:
         resp["city"] = name
     return resp, None
+
+
+def _run_scheduled(jobs):
+    """Fresh fetch for each job; returns the jobs where some source failed outright."""
+    retry = {}
+    for key, (loc_id, lat, lon, name) in jobs.items():
+        try:
+            resp, statuses = live_weather(loc_id, lat, lon, name, fresh=True, scheduled=True)
+            log.info("Scheduled refresh %s: %s", key, "ok" if resp else statuses)
+            with _live_lock:
+                failed = (_live.get(key) or {}).get("failed") if resp else True
+            if failed:
+                retry[key] = jobs[key]
+        except Exception:
+            log.exception("Scheduled refresh failed for %s", key)
+            retry[key] = jobs[key]
+    return retry
 
 
 def recorder_loop():
@@ -1314,12 +1371,13 @@ def recorder_loop():
                 del _live[key]
             for key, e in _live.items():
                 jobs.setdefault(key, (e["id"], e["lat"], e["lon"], e.get("name")))
-        for key, (loc_id, lat, lon, name) in jobs.items():
-            try:
-                resp, statuses = live_weather(loc_id, lat, lon, name, fresh=True, scheduled=True)
-                log.info("Scheduled refresh %s: %s", key, "ok" if resp else statuses)
-            except Exception:
-                log.exception("Scheduled refresh failed for %s", key)
+        retry = _run_scheduled(jobs)
+        for delay in SCHEDULED_RETRY_DELAYS_S:
+            if not retry:
+                break
+            time.sleep(delay)
+            log.info("Retrying %d place(s) where a source failed: %s", len(retry), ", ".join(retry))
+            retry = _run_scheduled(retry)
         if next_run.hour == 0:
             purge_old_records()
 

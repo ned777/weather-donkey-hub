@@ -141,6 +141,34 @@
                 android:layout_height="1dp"
                 android:background="@color/app_line" />
 
+            <!-- Shown while a pull-down refresh is working on the server, then
+                 "Updated just now ✓" for a moment — see MainActivity.showRefreshStatus(). -->
+            <LinearLayout
+                android:id="@+id/refreshBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:id="@+id/refreshProgress"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:indeterminate="true"
+                    android:indeterminateTint="@color/retro_cyan" />
+
+                <TextView
+                    android:id="@+id/refreshStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center"
+                    android:textColor="@color/retro_cyan"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
             <!-- ===== RIGHT NOW ===== -->
             <LinearLayout
                 android:layout_width="match_parent"

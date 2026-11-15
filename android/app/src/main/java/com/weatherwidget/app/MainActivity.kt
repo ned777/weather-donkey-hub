@@ -101,6 +101,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sunriseText: TextView
     private lateinit var sunsetText: TextView
     private lateinit var updatedText: TextView
+    private lateinit var refreshBanner: View
+    private lateinit var refreshProgress: View
+    private lateinit var refreshStatusText: TextView
+    private var refreshDots = 0
+    private val refreshTicker = object : Runnable {
+        override fun run() {
+            refreshDots = (refreshDots + 1) % 4
+            refreshStatusText.text = getString(R.string.refresh_working) + ".".repeat(refreshDots)
+            refreshStatusText.postDelayed(this, 400)
+        }
+    }
+    private val hideRefreshBanner = Runnable { refreshBanner.visibility = View.GONE }
     private lateinit var grantPermissionButton: TextView
     private lateinit var hourlyScroll: View
     private lateinit var hourlyContainer: LinearLayout
@@ -229,6 +241,9 @@ class MainActivity : AppCompatActivity() {
         sunriseText = findViewById(R.id.sunriseText)
         sunsetText = findViewById(R.id.sunsetText)
         updatedText = findViewById(R.id.updatedText)
+        refreshBanner = findViewById(R.id.refreshBanner)
+        refreshProgress = findViewById(R.id.refreshProgress)
+        refreshStatusText = findViewById(R.id.refreshStatusText)
         grantPermissionButton = findViewById(R.id.grantPermissionButton)
         hourlyScroll = findViewById(R.id.hourlyScroll)
         hourlyContainer = findViewById(R.id.hourlyContainer)
@@ -843,6 +858,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
         swipeRefresh.isRefreshing = true
+        showRefreshStatus(working = true)
+        val started = System.currentTimeMillis()
         Thread {
             syncLocationsWithServer() // picks up cities added/removed on the web page first
             val errors = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -864,13 +881,39 @@ class MainActivity : AppCompatActivity() {
             }
             workers.forEach { it.start() }
             workers.forEach { it.join() }
+            // a quick answer still shows the "working" state long enough to be seen
+            Thread.sleep(maxOf(0L, 700L - (System.currentTimeMillis() - started)))
             runOnUiThread {
                 swipeRefresh.isRefreshing = false
+                showRefreshStatus(working = false, error = errors[activeLocationId])
                 renderFromCache()
                 errors[activeLocationId]?.let { updatedText.text = it }
                 WeatherWidgetProvider.repaintAllWidgets(this)
             }
         }.start()
+    }
+
+    /** The banner under the tabs: a sliding bar + "Getting fresh weather…" while the
+     *  server works, then "Updated just now ✓" (or the error) that fades out. */
+    private fun showRefreshStatus(working: Boolean, error: String? = null) {
+        refreshStatusText.removeCallbacks(refreshTicker)
+        refreshBanner.removeCallbacks(hideRefreshBanner)
+        refreshBanner.animate().cancel()
+        refreshBanner.alpha = 1f
+        refreshBanner.visibility = View.VISIBLE
+        refreshProgress.visibility = if (working) View.VISIBLE else View.INVISIBLE
+        if (working) {
+            refreshDots = 0
+            refreshStatusText.setTextColor(ContextCompat.getColor(this, R.color.retro_cyan))
+            refreshStatusText.text = getString(R.string.refresh_working)
+            refreshStatusText.postDelayed(refreshTicker, 400)
+            return
+        }
+        refreshStatusText.setTextColor(ContextCompat.getColor(this, if (error == null) R.color.retro_cyan else R.color.app_dim))
+        refreshStatusText.text = error ?: getString(R.string.refresh_done)
+        refreshBanner.postDelayed({
+            refreshBanner.animate().alpha(0f).setDuration(300).withEndAction(hideRefreshBanner).start()
+        }, if (error == null) 1800L else 4000L)
     }
 
     /** Fetches one location from the server and caches it. Returns an error message, or null on success. */

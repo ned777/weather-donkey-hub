@@ -131,6 +131,23 @@
     padding: 3px 12px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
   .refresh:hover { background: #FFFFFF; color: #000; }
   .refresh:disabled { opacity: .6; cursor: default; }
+  .refresh .ico { display: inline-block; }
+  .refresh.busy { opacity: 1 !important; border-color: var(--teal); color: var(--teal); }
+  .refresh.busy .ico { animation: wd-spin .8s linear infinite; }
+  /* working-on-it bar under the Right Now header while the server fetches */
+  .busybar { height: 3px; margin: 6px 0 0; border-radius: 2px; overflow: hidden; visibility: hidden; background: rgba(255,255,255,.08); }
+  .busybar::before { content: ""; display: block; height: 100%; width: 35%; border-radius: 2px; background: var(--teal); }
+  .c-now.busy .busybar { visibility: visible; }
+  .c-now.busy .busybar::before { animation: wd-slide 1.1s ease-in-out infinite; }
+  @keyframes wd-slide { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+  .c-now .hero, .c-now .stats { transition: opacity .25s; }
+  .c-now.busy .hero, .c-now.busy .stats { opacity: .55; }
+  .working::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: wd-dots 1.2s steps(4) infinite; }
+  @keyframes wd-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+  .justnow { color: var(--teal); }
+  @media (prefers-reduced-motion: reduce) {
+    .refresh.busy .ico, .c-now.busy .busybar::before, .working::after { animation: none; }
+  }
 
   /* ---------- source picker ---------- */
   .srcpick { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
@@ -343,7 +360,8 @@
   <div class="grid">
     <!-- NOW -->
     <section class="card c-now">
-      <div class="card-head"><h2>Right Now</h2><button class="refresh" id="refresh">↻ Refresh</button><span class="meta" id="nowMeta"></span></div>
+      <div class="card-head"><h2>Right Now</h2><button class="refresh" id="refresh"><span class="ico">↻</span> Refresh</button><span class="meta" id="nowMeta"></span></div>
+      <div class="busybar" aria-hidden="true"></div>
       <div class="srcpick" id="srcpick" role="group" aria-label="Weather source"></div>
       <div class="hero">
         <div class="scene" id="scene" aria-hidden="true"></div>
@@ -597,18 +615,40 @@ document.addEventListener("visibilitychange", () => {
   scheduleNext();
 });
 
+// While the server works, the Right Now card shows it: spinning ↻, a sliding bar,
+// dimmed numbers and what it's doing. A manual refresh ends with "Updated just now ✓".
+function setBusy(on, text) {
+  document.querySelector(".c-now").classList.toggle("busy", on);
+  $("refresh").classList.toggle("busy", on);
+  $("refresh").disabled = on;
+  const u = $("updated");
+  u.classList.toggle("working", on);
+  u.classList.remove("error", "justnow");
+  if (text) u.textContent = text;
+}
+
 async function loadWeather(fresh = false) {
   if (!active) return;
-  $("updated").textContent = fresh ? "Refreshing…" : "Loading…";
-  $("updated").classList.remove("error");
+  setBusy(true, fresh ? "Asking Open-Meteo, MET Norway & 7Timer! for fresh weather" : "Loading");
+  const started = Date.now();
   const q = new URLSearchParams({ id: active.id, lat: active.lat, lon: active.lon, name: active.name || "" });
   if (fresh) q.set("fresh", "1");
   try {
-    lastSnapshot = await api("/api/weather?" + q);
+    const snap = await api("/api/weather?" + q);
+    // a quick answer still shows the animation long enough to be seen
+    if (fresh) await new Promise(r => setTimeout(r, Math.max(0, 600 - (Date.now() - started))));
+    lastSnapshot = snap;
+    setBusy(false);
     renderWeather();
     loadStats();
+    if (fresh) {
+      const u = $("updated");
+      u.textContent = "Updated just now ✓";
+      u.classList.add("justnow");
+      setTimeout(() => { if (u.classList.contains("justnow")) { u.classList.remove("justnow"); renderWeather(); } }, 2500);
+    }
   } catch (e) {
-    $("updated").textContent = e.message;
+    setBusy(false, e.message);
     $("updated").classList.add("error");
   }
 }

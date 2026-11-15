@@ -15,10 +15,18 @@ that:
   instead; the choice is remembered, and the widget follows the app's choice.
   A source that's down is skipped with a small yellow note such as
   *"Open-Meteo unavailable — averaging MET Norway & 7Timer!"*. A stuck connection
-  is dropped after 4 s and retried twice. A request fails only if all three are down.
+  is dropped after 4 s and retried twice (Open-Meteo: after 2.5 s, retried four
+  times, because its server sometimes stalls mid-handshake). If a source still
+  fails, its last good answer for that place (up to 3 hours old, trimmed to the
+  hours still ahead) is shown instead, so a short blip doesn't show the note at all;
+  it's never recorded. After each scheduled run, places where a source failed are
+  retried after 2, 5 and 10 minutes so Home's recording isn't lost. A request fails
+  only if all three are down and nothing recent is saved.
 - **Server refreshes every 3 hours on the clock (12, 3, 6, 9).** Opening the web page
   never fetches; it shows the latest scheduled snapshot. ↻ Refresh fetches right away without
-  moving the schedule. The phone has no timer: it refreshes only on pull-down or the
+  moving the schedule. While it works, the ↻ spins, a bar slides under the Right Now
+  header, the numbers dim and the status line says what's happening; it ends with
+  *"Updated just now ✓"*. The phone has no timer: it refreshes only on pull-down or the
   widget's "Tap below to refresh" strip (the rest of the widget opens the app).
 - **Records the weather for its own location only.** Home is where
   this computer is, and it's recorded from every source that answers into a local SQLite
@@ -151,6 +159,8 @@ for whichever tab is open.
 
 There's no background timer on the phone, and opening the app doesn't refresh.
 Weather refreshes only when you pull down, or tap the widget's **Tap below to refresh** strip (tapping the rest
-of the widget opens the app). Tap the donkey or the title for the city list:
+of the widget opens the app). While a pull-down refresh is working, a cyan bar and
+*"Getting fresh weather from the hub…"* show under the tabs, then *"Updated just now ✓"*
+(or the error) for a moment. Tap the donkey or the title for the city list:
 tap to switch; long-press for sort mode (drag a city from anywhere on its row, ✕ on the right to remove
 with a confirm; ✓ saves the order, ✕ at the top cancels).

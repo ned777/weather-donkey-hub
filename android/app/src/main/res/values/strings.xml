@@ -53,4 +53,6 @@
     <string name="widget_tap_refresh">Tap below to refresh</string>
     <string name="save">Save</string>
     <string name="drawer_sorting">Drag to sort</string>
+    <string name="refresh_working">Getting fresh weather from the hub</string>
+    <string name="refresh_done">Updated just now ✓</string>
 </resources>
