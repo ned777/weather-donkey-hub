@@ -308,19 +308,6 @@ object WeatherCache {
  * already cached (see MainActivity/WeatherWidgetProvider). Stored in the
  * same prefs file as the cache since it's the same small "weather" concern.
  */
-/** "Refresh when the app opens" — on by default. Pull-down and widget taps always refresh. */
-object AutoRefreshPreference {
-    private const val PREFS_NAME = "weather"
-    private const val KEY = "auto_refresh_on_open"
-
-    fun isOn(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY, true)
-
-    fun set(context: Context, on: Boolean) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY, on).apply()
-    }
-}
-
 object UnitPreference {
     private const val PREFS_NAME = "weather"
     private const val KEY_FAHRENHEIT = "unit_fahrenheit"

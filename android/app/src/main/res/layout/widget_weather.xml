@@ -254,13 +254,36 @@
 
     </LinearLayout>
 
+    <!-- The refresh area: "Tap to refresh" over the status line. Tapping HERE fetches new
+         weather; tapping anywhere else on the widget opens the app. -->
+    <LinearLayout
+        android:id="@+id/refreshArea"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/tapRefreshText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:gravity="center"
+        android:textColor="@color/retro_cyan"
+        android:textStyle="bold"
+        android:textSize="10sp"
+        android:maxLines="1"
+        android:text="@string/widget_tap_refresh" />
+
     <!-- Status line: "Updating…" mid-refresh, a permission/error prompt, or (once loaded)
          the last-updated time/date/timezone — always showing something, never blank. -->
     <TextView
         android:id="@+id/updatedText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:includeFontPadding="false"
         android:gravity="center"
         android:textColor="@color/retro_white_dim"
@@ -268,5 +291,6 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:text="" />
+    </LinearLayout>
 
 </LinearLayout>

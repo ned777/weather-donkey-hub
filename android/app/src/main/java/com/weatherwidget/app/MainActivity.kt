@@ -21,6 +21,8 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -72,7 +74,8 @@ class MainActivity : AppCompatActivity() {
     // avoids needing every one of these to be nullable (`SwipeRefreshLayout?`) just to
     // cover the brief moment before onCreate() has run.
     private lateinit var swipeRefresh: SwipeRefreshLayout
-    private lateinit var autoRefreshToggle: TextView
+    private lateinit var drawerLayout: DrawerLayout
+    private lateinit var drawerList: androidx.recyclerview.widget.RecyclerView
     private lateinit var tabLayout: TabLayout
     private lateinit var fahrenheitButton: TextView
     private lateinit var celsiusButton: TextView
@@ -99,7 +102,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sunsetText: TextView
     private lateinit var updatedText: TextView
     private lateinit var grantPermissionButton: TextView
-    private lateinit var removeLocationButton: TextView
     private lateinit var hourlyScroll: View
     private lateinit var hourlyContainer: LinearLayout
     private lateinit var forecastContainer: LinearLayout
@@ -228,7 +230,6 @@ class MainActivity : AppCompatActivity() {
         sunsetText = findViewById(R.id.sunsetText)
         updatedText = findViewById(R.id.updatedText)
         grantPermissionButton = findViewById(R.id.grantPermissionButton)
-        removeLocationButton = findViewById(R.id.removeLocationButton)
         hourlyScroll = findViewById(R.id.hourlyScroll)
         hourlyContainer = findViewById(R.id.hourlyContainer)
         forecastContainer = findViewById(R.id.forecastContainer)
@@ -260,7 +261,6 @@ class MainActivity : AppCompatActivity() {
         grantPermissionButton.setOnClickListener {
             requestPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
-        removeLocationButton.setOnClickListener { confirmRemoveActiveLocation() }
         fahrenheitButton.setOnClickListener { setUnit(fahrenheit = true) }
         celsiusButton.setOnClickListener { setUnit(fahrenheit = false) }
 
@@ -269,33 +269,38 @@ class MainActivity : AppCompatActivity() {
         updateUnitButtonsUi()
         renderFromCache()
 
-        autoRefreshToggle = findViewById(R.id.autoRefreshToggle)
-        updateAutoRefreshUi()
-        autoRefreshToggle.setOnClickListener {
-            AutoRefreshPreference.set(this, !AutoRefreshPreference.isOn(this))
-            updateAutoRefreshUi()
+        // Tap the donkey or the name → the city list slides in from the left. Edge swipes
+        // stay off (sideways swipes change tabs); once open, swiping or tapping outside closes it.
+        drawerLayout = findViewById(R.id.drawerLayout)
+        drawerList = findViewById(R.id.drawerList)
+        setupDrawerList()
+        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+        drawerLayout.addDrawerListener(object : DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerOpened(drawerView: View) = drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+            override fun onDrawerClosed(drawerView: View) {
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                if (sorting) setSorting(false) // closing without ✓ = cancel
+            }
+        })
+        findViewById<View>(R.id.brandButton).setOnClickListener {
+            renderDrawer()
+            drawerLayout.openDrawer(GravityCompat.START)
         }
-        if (savedInstanceState == null) autoRefreshOnOpen()
-    }
-
-    // Opening the app (fresh start, or coming back from the home screen) refreshes every
-    // tab when "Refresh when app opens" is on; otherwise it just shows the last update.
-    override fun onRestart() {
-        super.onRestart()
-        autoRefreshOnOpen()
-    }
-
-    private fun updateAutoRefreshUi() {
-        val on = AutoRefreshPreference.isOn(this)
-        autoRefreshToggle.text = getString(if (on) R.string.auto_refresh_on else R.string.auto_refresh_off)
-        autoRefreshToggle.setTextColor(ContextCompat.getColor(this, if (on) R.color.retro_cyan else R.color.app_dim))
-    }
-
-    // Never pops the location permission dialog on its own — that stays behind a tap.
-    private fun autoRefreshOnOpen() {
-        if (!AutoRefreshPreference.isOn(this)) return
-        if (activeLocationId == WeatherCache.CURRENT_LOCATION_ID && !LocationHelper.hasPermission(this)) return
-        if (!swipeRefresh.isRefreshing) startRefresh()
+        findViewById<View>(R.id.drawerAdd).setOnClickListener {
+            drawerLayout.closeDrawer(GravityCompat.START)
+            showAddLocationDialog()
+        }
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        })
     }
 
     // Observes every touch the Activity sees (without consuming it — normal scrolling,
@@ -303,6 +308,8 @@ class MainActivity : AppCompatActivity() {
     // feed tabSwipeDetector's fling detection and to remember whether THIS gesture started
     // inside the converter or the hourly strip.
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        // While the city list is open, it gets plain touches — no tab swipes underneath.
+        if (::drawerLayout.isInitialized && drawerLayout.isDrawerVisible(GravityCompat.START)) return super.dispatchTouchEvent(ev)
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 touchDownX = ev.rawX
@@ -369,6 +376,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupTabs() {
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
+                if (rebuildingTabs) return
                 val tag = tab.tag as? String
                 if (tag == null) {
                     // The trailing "+" tab has no tag — it's an action, not a real
@@ -391,20 +399,46 @@ class MainActivity : AppCompatActivity() {
         rebuildTabs()
     }
 
-    private fun rebuildTabs() {
-        tabLayout.removeAllTabs()
-        tabLayout.addTab(tabLayout.newTab().setText(getString(R.string.tab_current)).setTag(WeatherCache.CURRENT_LOCATION_ID))
-        savedLocations.forEach { loc ->
-            tabLayout.addTab(tabLayout.newTab().setText(loc.displayName.substringBefore(",")).setTag(loc.id))
+    // A tab whose label never wraps (TabLayout's own label goes to 2 lines for long
+    // names like "Joshua Tree National Park"). Same colors: cyan when selected, dim otherwise.
+    private fun oneLineTab(label: String): TabLayout.Tab {
+        val view = TextView(this).apply {
+            id = android.R.id.text1
+            isAllCaps = true
+            maxLines = 1
+            textSize = 14f
+            letterSpacing = 0.08f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setTextColor(tabLayout.tabTextColors)
         }
-        tabLayout.addTab(tabLayout.newTab().setText("+")) // no tag — see setupTabs()
+        // TabLayout copies the tab's text into this view, so the text goes on the tab too.
+        return tabLayout.newTab().setCustomView(view).setText(label)
+    }
 
-        val activeIndex = if (activeLocationId == WeatherCache.CURRENT_LOCATION_ID) {
+    // True while the tab strip is being rebuilt: adding the first tab auto-selects it,
+    // which must not switch away from the location that's actually open.
+    private var rebuildingTabs = false
+
+    private fun rebuildTabs() {
+        val target = activeLocationId
+        rebuildingTabs = true
+        tabLayout.removeAllTabs()
+        tabLayout.addTab(oneLineTab(getString(R.string.tab_current)).setTag(WeatherCache.CURRENT_LOCATION_ID))
+        savedLocations.forEach { loc ->
+            tabLayout.addTab(oneLineTab(loc.displayName.substringBefore(",")).setTag(loc.id))
+        }
+        tabLayout.addTab(oneLineTab("+")) // no tag — see setupTabs()
+        rebuildingTabs = false
+
+        val activeIndex = if (target == WeatherCache.CURRENT_LOCATION_ID) {
             0
         } else {
-            savedLocations.indexOfFirst { it.id == activeLocationId }.let { if (it < 0) 0 else it + 1 }
+            savedLocations.indexOfFirst { it.id == target }.let { if (it < 0) 0 else it + 1 }
         }
+        activeLocationId = (tabLayout.getTabAt(activeIndex)?.tag as? String) ?: WeatherCache.CURRENT_LOCATION_ID
         tabLayout.getTabAt(activeIndex)?.select()
+        renderFromCache()
     }
 
     // --- Adding / removing locations -------------------------------------
@@ -468,18 +502,191 @@ class MainActivity : AppCompatActivity() {
         rebuildTabs() // selecting the new tab triggers renderFromCache() via the listener
     }
 
-    private fun confirmRemoveActiveLocation() {
-        val id = activeLocationId
-        if (id == WeatherCache.CURRENT_LOCATION_ID) return
+    // --- City drawer ------------------------------------------------------
+    // Normal mode: tap a city to show it, ✕ to remove it (with a confirm).
+    // Long-press any city → sort mode: drag cities into order, ✓ saves, ✕ cancels.
+    // Current always stays on top.
+
+    private var sorting = false
+    private var drawerItems = mutableListOf<Pair<String, String>>() // (id, display name)
+    private val drawerAdapter = DrawerAdapter()
+    private val dragHelper = androidx.recyclerview.widget.ItemTouchHelper(object :
+        androidx.recyclerview.widget.ItemTouchHelper.SimpleCallback(
+            androidx.recyclerview.widget.ItemTouchHelper.UP or androidx.recyclerview.widget.ItemTouchHelper.DOWN, 0) {
+        override fun isLongPressDragEnabled() = sorting
+        override fun getMovementFlags(rv: androidx.recyclerview.widget.RecyclerView, vh: androidx.recyclerview.widget.RecyclerView.ViewHolder): Int =
+            if (!sorting || vh.adapterPosition == 0) 0 else super.getMovementFlags(rv, vh)
+        override fun onMove(rv: androidx.recyclerview.widget.RecyclerView, from: androidx.recyclerview.widget.RecyclerView.ViewHolder,
+                            to: androidx.recyclerview.widget.RecyclerView.ViewHolder): Boolean {
+            val f = from.adapterPosition
+            val t = to.adapterPosition
+            if (f <= 0 || t <= 0) return false // Current stays first
+            drawerItems.add(t, drawerItems.removeAt(f))
+            drawerAdapter.notifyItemMoved(f, t)
+            return true
+        }
+        override fun onSwiped(vh: androidx.recyclerview.widget.RecyclerView.ViewHolder, direction: Int) {}
+        override fun onSelectedChanged(vh: androidx.recyclerview.widget.RecyclerView.ViewHolder?, state: Int) {
+            super.onSelectedChanged(vh, state)
+            if (state == androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_DRAG) {
+                vh?.itemView?.setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.app_line))
+            }
+        }
+        override fun clearView(rv: androidx.recyclerview.widget.RecyclerView, vh: androidx.recyclerview.widget.RecyclerView.ViewHolder) {
+            super.clearView(rv, vh)
+            vh.itemView.setBackgroundResource(android.R.drawable.list_selector_background)
+        }
+    })
+
+    private fun setupDrawerList() {
+        drawerList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        drawerList.adapter = drawerAdapter
+        drawerList.addItemDecoration(androidx.recyclerview.widget.DividerItemDecoration(this, androidx.recyclerview.widget.DividerItemDecoration.VERTICAL).apply {
+            setDrawable(android.graphics.drawable.ShapeDrawable().apply {
+                intrinsicHeight = 1
+                paint.color = ContextCompat.getColor(this@MainActivity, R.color.app_line)
+            })
+        })
+        dragHelper.attachToRecyclerView(drawerList)
+        findViewById<View>(R.id.sortSave).setOnClickListener {
+            LocationStore.setOrder(this, drawerItems.drop(1).map { it.first })
+            savedLocations = LocationStore.list(this)
+            setSorting(false)
+            rebuildTabs()
+        }
+        findViewById<View>(R.id.sortCancel).setOnClickListener { setSorting(false) }
+    }
+
+    /** Reloads the list from the saved order (also how sort mode's ✕ throws changes away). */
+    private fun renderDrawer() {
+        drawerItems = (listOf(WeatherCache.CURRENT_LOCATION_ID to getString(R.string.tab_current)) +
+            savedLocations.map { it.id to it.displayName }).toMutableList()
+        drawerAdapter.notifyDataSetChanged()
+    }
+
+    private fun setSorting(on: Boolean) {
+        sorting = on
+        findViewById<TextView>(R.id.drawerTitle).setText(if (on) R.string.drawer_sorting else R.string.drawer_title)
+        findViewById<View>(R.id.sortSave).visibility = if (on) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.sortCancel).visibility = if (on) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.drawerAdd).visibility = if (on) View.GONE else View.VISIBLE
+        renderDrawer()
+    }
+
+    private inner class DrawerHolder(val row: LinearLayout, val city: TextView, val region: TextView, val action: TextView) :
+        androidx.recyclerview.widget.RecyclerView.ViewHolder(row)
+
+    private inner class DrawerAdapter : androidx.recyclerview.widget.RecyclerView.Adapter<DrawerHolder>() {
+        override fun getItemCount() = drawerItems.size
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DrawerHolder {
+            val density = resources.displayMetrics.density
+            fun dp(v: Int) = (v * density).toInt()
+            val row = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                minimumHeight = dp(56)
+                setPaddingRelative(dp(18), 0, dp(6), 0)
+                setBackgroundResource(android.R.drawable.list_selector_background)
+                layoutParams = androidx.recyclerview.widget.RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            }
+            // City on one line (shrinks to fit, never wraps), region/country smaller underneath.
+            val names = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(8), dp(4), dp(8))
+            }
+            val city = TextView(this@MainActivity).apply {
+                maxLines = 1
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    this, 11, 16, 1, TypedValue.COMPLEX_UNIT_SP)
+            }
+            val region = TextView(this@MainActivity).apply {
+                textSize = 12.5f
+                isSingleLine = true
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_dim))
+            }
+            names.addView(city, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(22)))
+            names.addView(region)
+            row.addView(names, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            val action = TextView(this@MainActivity).apply {
+                gravity = android.view.Gravity.CENTER
+                setBackgroundResource(android.R.drawable.list_selector_background)
+            }
+            row.addView(action, LinearLayout.LayoutParams(dp(48), dp(48)))
+            return DrawerHolder(row, city, region, action)
+        }
+
+        @android.annotation.SuppressLint("ClickableViewAccessibility")
+        override fun onBindViewHolder(holder: DrawerHolder, position: Int) {
+            val (id, name) = drawerItems[position]
+            val isCurrent = id == WeatherCache.CURRENT_LOCATION_ID
+            val active = id == activeLocationId && !sorting
+            holder.city.text = name.substringBefore(",").trim()
+            holder.city.setTypeface(null, if (active) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+            holder.city.setTextColor(ContextCompat.getColor(this@MainActivity, when {
+                active -> R.color.retro_cyan
+                sorting && isCurrent -> R.color.app_faint
+                else -> R.color.retro_white
+            }))
+            val rest = name.substringAfter(",", "").trim()
+            holder.region.text = rest
+            holder.region.visibility = if (rest.isEmpty()) View.GONE else View.VISIBLE
+
+            holder.row.setOnClickListener {
+                if (sorting) return@setOnClickListener
+                drawerLayout.closeDrawer(GravityCompat.START)
+                selectLocation(id)
+            }
+            holder.row.setOnLongClickListener {
+                if (sorting) return@setOnLongClickListener false
+                setSorting(true)
+                true
+            }
+            holder.action.setOnTouchListener(null)
+            holder.action.setOnClickListener(null)
+            when {
+                isCurrent -> holder.action.text = ""
+                sorting -> {
+                    // ≡ drag handle: touching it picks the row up straight away.
+                    holder.action.text = "≡"
+                    holder.action.textSize = 24f
+                    holder.action.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.retro_cyan))
+                    holder.action.contentDescription = "Drag to move"
+                    holder.action.setOnTouchListener { _, ev ->
+                        if (ev.actionMasked == MotionEvent.ACTION_DOWN) dragHelper.startDrag(holder)
+                        false
+                    }
+                }
+                else -> {
+                    holder.action.text = "✕"
+                    holder.action.textSize = 18f
+                    holder.action.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.app_down))
+                    holder.action.contentDescription = getString(R.string.remove)
+                    holder.action.setOnClickListener { confirmRemoveLocation(id, name) }
+                }
+            }
+        }
+    }
+
+    private fun selectLocation(id: String) {
+        if (id == activeLocationId) return
+        // Select the existing tab; its listener switches and renders.
+        (0 until tabLayout.tabCount).map { tabLayout.getTabAt(it) }.firstOrNull { it?.tag == id }?.select()
+    }
+
+    private fun confirmRemoveLocation(id: String, name: String) {
         AlertDialog.Builder(this)
-            .setMessage(R.string.remove_location_confirm)
+            .setMessage(getString(R.string.remove_city_confirm, name.substringBefore(",")))
             .setPositiveButton(R.string.remove) { _, _ ->
                 LocationStore.remove(this, id)
                 WeatherCache.clear(this, id)
                 Thread { WeatherClient.forgetLocation(id) }.start()
                 savedLocations = LocationStore.list(this)
-                activeLocationId = WeatherCache.CURRENT_LOCATION_ID
+                if (activeLocationId == id) activeLocationId = WeatherCache.CURRENT_LOCATION_ID
                 rebuildTabs()
+                renderDrawer()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -511,7 +718,6 @@ class MainActivity : AppCompatActivity() {
         val isCurrentTab = id == WeatherCache.CURRENT_LOCATION_ID
         val hasPermission = LocationHelper.hasPermission(this)
         grantPermissionButton.visibility = if (isCurrentTab && !hasPermission) View.VISIBLE else View.GONE
-        removeLocationButton.visibility = if (isCurrentTab) View.GONE else View.VISIBLE
 
         val full = WeatherCache.read(this, id)
         if (full != null) {

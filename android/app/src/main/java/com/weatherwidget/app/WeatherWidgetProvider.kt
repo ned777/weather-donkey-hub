@@ -26,8 +26,9 @@ import kotlin.math.roundToInt
 private enum class WidgetSizeTier { COMPACT, FULL }
 
 /**
- * The widget's brain. A tap fetches fresh weather (onReceive() below). It also
- * repaints whenever the app refreshes (launch or pull-down); there is no timer. onUpdate() and onAppWidgetOptionsChanged() (called on
+ * The widget's brain. Tapping the "Tap to refresh" strip fetches fresh weather
+ * (onReceive() below); tapping anywhere else opens the app. It also repaints
+ * whenever the app refreshes (pull-down); there is no timer. onUpdate() and onAppWidgetOptionsChanged() (called on
  * first placement, reboot, and resize) only ever repaint from whatever is
  * already cached.
  */
@@ -332,12 +333,13 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                 // that shared half is the real vertical budget each one has to fit within,
                 // not just an estimate.
                 val cityHeightPx = textHeightPx(context, todaySp, bold = true)
-                val updatedHeightPx = textHeightPx(context, 10f, bold = false)
+                // The bottom strip: "Tap to refresh" + the updated line, with refreshArea's
+                // 2dp margin, 2dp+2dp padding and updatedText's 2dp margin (widget_weather.xml).
+                val updatedHeightPx = 2 * textHeightPx(context, 10f, bold = false) + dpToPx(context, 8)
                 val totalHeightPx = dpToPx(context, minHeightDp).toFloat()
                 val availableContentHeightPx = (
                     totalHeightPx - 2 * verticalPaddingPx - cityHeightPx -
-                        dpToPx(context, 2) - dpToPx(context, 8) -
-                        dpToPx(context, 4) - updatedHeightPx
+                        dpToPx(context, 2) - dpToPx(context, 8) - updatedHeightPx
                     ).coerceAtLeast(0f)
                 val halfContentHeightPx = availableContentHeightPx / 2f
 
@@ -388,6 +390,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                 setSp(context, views, R.id.conditionText, conditionSp)
             }
             setSp(context, views, R.id.updatedText, 10f)
+            setSp(context, views, R.id.tapRefreshText, 10f)
 
             views.setViewVisibility(R.id.todayHighLowText, if (tier == WidgetSizeTier.FULL) View.VISIBLE else View.GONE)
             views.setViewVisibility(R.id.sunRow, if (tier == WidgetSizeTier.FULL) View.VISIBLE else View.GONE)
@@ -444,11 +447,9 @@ class WeatherWidgetProvider : AppWidgetProvider() {
             return (sizeSp * (maxWidthPx / measured)).coerceAtLeast(minSp)
         }
 
-        // Tapping either fetches fresh weather or opens MainActivity to ask for
-        // location permission — a widget/BroadcastReceiver has no UI of its own, so
-        // only an Activity can show the system permission dialog. Only the "current"
-        // (GPS) binding ever needs that fallback; a widget bound to a searched city
-        // never needs location permission at all, so it always just refreshes.
+        // Two tap targets: the bottom "Tap to refresh" strip fetches fresh weather (or opens
+        // MainActivity to ask for location permission, since a widget can't show that
+        // dialog itself); the rest of the widget opens the app.
         // A PendingIntent is a "voucher" for an Intent (Android's message for "do this
         // action") that lets a DIFFERENT process — here, the home-screen launcher app,
         // since it's the one that actually detects the tap on this RemoteViews content —
@@ -456,23 +457,24 @@ class WeatherWidgetProvider : AppWidgetProvider() {
         // is the only way a widget can respond to a tap, since RemoteViews content has no
         // click listeners of its own the way a normal button would.
         private fun setClickIntent(context: Context, views: RemoteViews, id: Int, locationId: String) {
+            val openApp = PendingIntent.getActivity(
+                context, id,
+                Intent(context, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            // Anywhere on the widget opens the app…
+            views.setOnClickPendingIntent(R.id.weatherWidgetRoot, openApp)
+            // …except the "Tap to refresh" / last-updated strip at the bottom, which fetches
+            // new weather (or opens the app to ask for location permission if it's still needed).
             val needsPermission = locationId == WeatherCache.CURRENT_LOCATION_ID && !LocationHelper.hasPermission(context)
-            val pendingIntent = if (!needsPermission) {
-                PendingIntent.getBroadcast(
-                    context, id,
-                    Intent(context, WeatherWidgetProvider::class.java)
-                        .setAction(ACTION_REFRESH)
-                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            } else {
-                PendingIntent.getActivity(
-                    context, id,
-                    Intent(context, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            }
-            views.setOnClickPendingIntent(R.id.weatherWidgetRoot, pendingIntent)
+            val refresh = if (needsPermission) openApp else PendingIntent.getBroadcast(
+                context, id,
+                Intent(context, WeatherWidgetProvider::class.java)
+                    .setAction(ACTION_REFRESH)
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.refreshArea, refresh)
         }
     }
 

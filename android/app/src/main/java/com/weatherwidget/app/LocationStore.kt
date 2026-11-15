@@ -37,6 +37,13 @@ object LocationStore {
         save(context, updated)
     }
 
+    /** Saves a new order (ids from the city drawer's sort mode); the tabs follow it. */
+    fun setOrder(context: Context, ids: List<String>) {
+        val byId = list(context).associateBy { it.id }
+        val ordered = ids.mapNotNull { byId[it] }
+        save(context, ordered + byId.values.filter { it.id !in ids })
+    }
+
     fun remove(context: Context, id: String) {
         save(context, list(context).filterNot { it.id == id })
     }

@@ -18,8 +18,8 @@ that:
   is dropped after 4 s and retried twice. A request fails only if all three are down.
 - **Server refreshes every 3 hours on the clock (12, 3, 6, 9).** Opening the web page
   never fetches; it shows the latest scheduled snapshot. ↻ Refresh fetches right away without
-  moving the schedule. The phone has no timer: it refreshes on app open (optional, on by
-  default), pull-down, or a widget tap.
+  moving the schedule. The phone has no timer: it refreshes only on pull-down or the
+  widget's "Tap to refresh" strip (the rest of the widget opens the app).
 - **Records the weather for its own location only.** Home is where
   this computer is, and it's recorded from every source that answers into a local SQLite
   database. Saved cities and the phone's **Current** (GPS) tab show live
@@ -148,6 +148,7 @@ an app tab, since it would duplicate Current. It adds a **What Was the Weather?*
 date and either a time or "Whole day", tap **Look Up**, and it shows the answer
 for whichever tab is open.
 
-There's no background timer on the phone. Weather refreshes when you open the
-app (**↻ Refresh when app opens**, on by default, tap to turn off), pull down,
-or tap the widget.
+There's no background timer on the phone, and opening the app doesn't refresh.
+Weather refreshes only when you pull down, or tap the widget's **Tap to refresh** strip (tapping the rest
+of the widget opens the app). Tap the donkey or the title for the city list:
+tap to switch, ✕ to remove (with a confirm), long-press to drag-sort (✓ save, ✕ cancel).
