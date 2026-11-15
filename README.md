@@ -16,7 +16,10 @@ that:
   A source that's down is skipped with a small yellow note such as
   *"Open-Meteo unavailable — averaging MET Norway & 7Timer!"*. A stuck connection
   is dropped after 4 s and retried twice. A request fails only if all three are down.
-- **Records the weather every 2 hours for its own location only.** Home is where
+- **Refreshes every 3 hours on the clock (12, 3, 6, 9).** Opening the web page or app
+  never fetches; it shows the latest scheduled snapshot. ↻ Refresh, pull-down and a widget tap
+  fetch right away without moving the schedule.
+- **Records the weather for its own location only.** Home is where
   this computer is, and it's recorded from every source that answers into a local SQLite
   database. Saved cities and the phone's **Current** (GPS) tab show live
   weather but are **never recorded**, wherever you are.
@@ -108,9 +111,9 @@ Only Home is stored.
   WMO weather code, day/night, wind, rain chance). Refreshing again within the
   same hour overwrites that hour's row.
 - `daily`: one row per source, per day (high/low, condition,
-  wind, rain chance, sunrise/sunset). It's updated every 2 hours, so it ends up as
+  wind, rain chance, sunrise/sunset). It's updated every 3 hours, so it ends up as
   that day's summary.
-- Anything older than 10 years is deleted every night at 02:02.
+- Anything older than 10 years is deleted every night at midnight.
 
 MET Norway and 7Timer! are converted to Open-Meteo's terms (°F, mph, WMO weather
 codes). Neither has a rain-chance percentage (MET Norway only has one in the
@@ -144,6 +147,7 @@ an app tab, since it would duplicate Current. It adds a **What Was the Weather?*
 date and either a time or "Whole day", tap **Look Up**, and it shows the answer
 for whichever tab is open.
 
-Like the original, it never refreshes in the background. Weather only loads
-when you pull down in the app or tap the widget. The server does the hourly
-recording on its own.
+Opening the app never fetches. Every 3 hours on the clock (12, 3, 6, 9) a phone
+alarm picks up the server's scheduled snapshot for every tab and repaints the
+widgets. Pull down or tap the widget to fetch right now; that never moves the
+schedule. A missed slot (phone off) is caught up the next time the app opens.

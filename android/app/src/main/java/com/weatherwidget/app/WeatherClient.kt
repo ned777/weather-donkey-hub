@@ -38,8 +38,10 @@ object WeatherClient {
      * Fresh weather for one location. Also tells the server about this location
      * (id, name, coordinates), which is what keeps it recording hourly.
      */
-    fun fetchWeather(locationId: String, name: String?, lat: Double, lon: Double): Outcome<WeatherSnapshot> {
+    /** [fresh] = fetch right now (pull-down / widget tap); otherwise the server's 3-hour scheduled snapshot. */
+    fun fetchWeather(locationId: String, name: String?, lat: Double, lon: Double, fresh: Boolean = false): Outcome<WeatherSnapshot> {
         val params = buildMap {
+            if (fresh) put("fresh", "1")
             put("id", locationId)
             if (name != null) put("name", name)
             put("lat", lat.toString())

@@ -10,7 +10,7 @@ What it does:
     (primary), MET Norway and 7Timer! (backups). Whatever is down is skipped and the response carries a short
     `notice` saying so; a request fails only if every source is down.
   * Records ONLY its own location ("Home" — where this computer is) every
-    2 hours, plus whenever Home is refreshed, into a local SQLite database.
+    3 hours on the clock (12, 3, 6, 9 …), plus whenever Home is refreshed, into a local SQLite database.
     Saved cities and the phone's GPS position are shown live, never recorded.
   * Keeps those recordings for 10 years, then deletes them.
   * Answers "what was the weather on <date> [at <time>]?" from its own
@@ -30,8 +30,9 @@ lookups, and the °F/°C converter, in the same look as the app.
 API (all GET unless noted, all JSON):
   /api/health
   /api/weather?id=<loc id>&name=<display name>&lat=<lat>&lon=<lon>
-      Fetches fresh weather in exactly the shape the app caches.
-      Recorded only when id=home (the server's own location).
+      Weather in exactly the shape the app caches. Served from the scheduled
+      3-hour snapshot; add &fresh=1 (Refresh button / pull-down / widget tap)
+      to fetch right now. Recorded only when id=home (the server's own location).
   /api/history?id=<loc id>&lat=<lat>&lon=<lon>&date=YYYY-MM-DD[&time=HH:MM]
       What the weather was on that day (and at that hour, if given).
   /api/locations[?all=1]             — Home + saved cities (all=1: also removed ones)
@@ -40,7 +41,7 @@ API (all GET unless noted, all JSON):
   POST /api/home?name=&lat=&lon=     — move the server's Home location
   DELETE /api/locations?id=<loc id>  — stop recording (history is kept)
 
-Recording: ONLY Home (the server's own location), every 2 hours. Saved cities and the
+Recording: ONLY Home (the server's own location), every 3 hours on the clock. Saved cities and the
 phone's "Current" (GPS) tab are shown live and never recorded; their history
 comes from the Open-Meteo archive (or Home's recordings when within 10 km).
 """
@@ -73,8 +74,14 @@ HOURLY_COUNT = 12          # the app's "Next 12 Hours" strip
 FORECAST_DAYS = 5          # the app's "5-Day Forecast" list (after today)
 HTTP_TIMEOUT_S = 4         # a stuck connection is dropped after 4 s…
 RETRY_DELAYS_S = (0.5, 1.5)  # …and tried again twice; all sources run in parallel
-RECORD_EVERY_HOURS = 2     # Home is recorded every 2 hours (00:02, 02:02, …)
-RECORD_MINUTE = 2
+# The schedule: every 3 hours on the clock (12, 3, 6, 9 …) the server fetches fresh
+# weather for Home (recorded) and every place someone looked at recently (cached).
+# Opening the page or app only reads that cache; a manual refresh fetches now but
+# never moves the schedule.
+RECORD_EVERY_HOURS = 3
+RECORD_MINUTE = 0
+LIVE_CACHE_PATH = os.path.join(DATA_DIR, "live_cache.json")
+LIVE_CACHE_KEEP_S = 24 * 3600  # places not asked about for a day drop out of the schedule
 
 # MET Norway's terms require a User-Agent that identifies the app.
 USER_AGENT = "WeatherDonkeyHub/1.0 (+https://github.com/ned777/weather-donkey-hub)"
@@ -290,7 +297,7 @@ def record(loc_id, lat, lon, data):
 
 
 def _next_recording(now):
-    """Next HH:02 where HH is a multiple of RECORD_EVERY_HOURS (00:02, 02:02, …)."""
+    """Next scheduled refresh: HH:00 where HH is a multiple of RECORD_EVERY_HOURS (00:00, 03:00, …)."""
     run = now.replace(minute=RECORD_MINUTE, second=0, microsecond=0)
     run -= timedelta(hours=run.hour % RECORD_EVERY_HOURS)
     while run <= now:
@@ -1215,19 +1222,105 @@ def onthisday_loop():
 # Hourly recorder
 # ---------------------------------------------------------------------------
 
+def _slot_start(now=None):
+    """When the current 3-hour slot began (local time), as epoch seconds."""
+    now = now or datetime.now()
+    start = now.replace(minute=RECORD_MINUTE, second=0, microsecond=0)
+    start -= timedelta(hours=start.hour % RECORD_EVERY_HOURS)
+    if start > now:
+        start -= timedelta(hours=RECORD_EVERY_HOURS)
+    return start.timestamp()
+
+
+_live = {}           # key -> {"t": fetched epoch, "asked": last asked epoch, "id","lat","lon","name","resp"}
+_live_lock = threading.Lock()
+_key_locks = {}
+
+
+def _live_key(loc_id, lat, lon):
+    return HOME_ID if loc_id == HOME_ID else f"{loc_id}|{lat:.2f}|{lon:.2f}"
+
+
+def _load_live_cache():
+    try:
+        with open(LIVE_CACHE_PATH) as f:
+            _live.update(json.load(f))
+    except (OSError, ValueError):
+        pass
+
+
+def _save_live_cache():
+    with _live_lock:
+        data = json.dumps(_live)
+    tmp = LIVE_CACHE_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(data)
+    os.replace(tmp, LIVE_CACHE_PATH)
+
+
+def live_weather(loc_id, lat, lon, name, fresh=False, scheduled=False):
+    """
+    The weather for one place. Returns the cached snapshot from the current 3-hour
+    slot when there is one; fetches (and caches) when fresh=True or the cache is
+    from an earlier slot. Returns (response, None) or (None, statuses) when every
+    source is down.
+    """
+    key = _live_key(loc_id, lat, lon)
+    with _live_lock:
+        lock = _key_locks.setdefault(key, threading.Lock())
+    with lock:  # two requests for the same place share one fetch
+        with _live_lock:
+            entry = _live.get(key)
+            if entry and not scheduled:
+                entry["asked"] = time.time()
+        if entry and not fresh and entry["t"] >= _slot_start():
+            resp = dict(entry["resp"])
+        else:
+            results, statuses = fetch_and_record(loc_id, lat, lon, loc_id == HOME_ID)
+            if not results:
+                if entry and not fresh:
+                    return dict(entry["resp"]), None  # better an older snapshot than nothing
+                return None, statuses
+            resp = weather_response(results, statuses, name)
+            with _live_lock:
+                asked = entry.get("asked", 0) if (entry and scheduled) else time.time()
+                _live[key] = {"t": time.time(), "asked": asked, "id": loc_id,
+                              "lat": lat, "lon": lon, "name": name, "resp": resp}
+            try:
+                _save_live_cache()
+            except OSError:
+                log.exception("Could not save the weather cache")
+    if name:
+        resp["city"] = name
+    return resp, None
+
+
 def recorder_loop():
+    """Every 3 hours on the clock: refresh Home (recorded) plus every place asked
+    about in the last day, so opening the page or app is instant and never fetches."""
     purge_old_records()
     while True:
         now = datetime.now()
         next_run = _next_recording(now)
-        time.sleep((next_run - now).total_seconds())
-        for loc in [l for l in active_locations() if l["id"] == HOME_ID]:
+        time.sleep(max(0, (next_run - now).total_seconds()) + 1)
+        home = get_location(HOME_ID)
+        jobs = {HOME_ID: (HOME_ID, home["lat"], home["lon"], home["name"])}
+        for loc in active_locations():
+            if loc["id"] != HOME_ID:
+                jobs[_live_key(loc["id"], loc["lat"], loc["lon"])] = (loc["id"], loc["lat"], loc["lon"], loc["name"])
+        cutoff = time.time() - LIVE_CACHE_KEEP_S
+        with _live_lock:
+            for key in [k for k, e in _live.items() if e.get("asked", 0) < cutoff and k not in jobs]:
+                del _live[key]
+            for key, e in _live.items():
+                jobs.setdefault(key, (e["id"], e["lat"], e["lon"], e.get("name")))
+        for key, (loc_id, lat, lon, name) in jobs.items():
             try:
-                _, statuses = fetch_and_record(loc["id"], loc["lat"], loc["lon"])
-                log.info("Recorded %s (%s): %s", loc["id"], loc["name"], statuses)
+                resp, statuses = live_weather(loc_id, lat, lon, name, fresh=True, scheduled=True)
+                log.info("Scheduled refresh %s: %s", key, "ok" if resp else statuses)
             except Exception:
-                log.exception("Hourly recording failed for %s", loc["id"])
-        if next_run.hour == 2:
+                log.exception("Scheduled refresh failed for %s", key)
+        if next_run.hour == 0:
             purge_old_records()
 
 
@@ -1292,11 +1385,11 @@ class Handler(BaseHTTPRequestHandler):
                 if record_it:
                     home = get_location(HOME_ID)
                     lat, lon, name = home["lat"], home["lon"], home["name"]
-                results, statuses = fetch_and_record(loc_id, lat, lon, record_it)
-                if not results:
+                resp, statuses = live_weather(loc_id, lat, lon, name, fresh=p.get("fresh") == "1")
+                if resp is None:
                     return self._send(503, {"error": "All weather services are unavailable",
                                             "sources": statuses})
-                return self._send(200, weather_response(results, statuses, name))
+                return self._send(200, resp)
 
             if path == "/api/history":
                 lat, lon = self._coords(p)
@@ -1387,6 +1480,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     init_db()
+    _load_live_cache()
     threading.Thread(target=recorder_loop, name="recorder", daemon=True).start()
     threading.Thread(target=onthisday_loop, name="onthisday", daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)

@@ -20,6 +20,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Sets the 3-hour refresh alarm again after the phone restarts. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:networkSecurityConfig="@xml/network_security_config"
@@ -68,8 +70,8 @@
           lifecycle broadcasts regardless of this flag).
             - APPWIDGET_UPDATE is the standard system broadcast.
             - com.weatherwidget.app.ACTION_REFRESH is OUR OWN broadcast, fired
-              only when the widget is tapped — there is no periodic timer
-              (see weather_widget_info.xml: updatePeriodMillis="0").
+              only when the widget is tapped. The 3-hour schedule is the
+              separate ScheduledRefreshReceiver below.
         -->
         <receiver
             android:name=".WeatherWidgetProvider"
@@ -81,6 +83,16 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/weather_widget_info" />
+        </receiver>
+
+        <!-- Every 3 hours on the clock (12, 3, 6, 9 …), see ScheduledRefresh.kt. -->
+        <receiver
+            android:name=".ScheduledRefreshReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
 
     </application>

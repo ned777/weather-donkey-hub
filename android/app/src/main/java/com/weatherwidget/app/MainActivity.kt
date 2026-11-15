@@ -269,6 +269,37 @@ class MainActivity : AppCompatActivity() {
         renderFromCache()
     }
 
+    // Opening the app never fetches. It only catches up when a scheduled 3-hour refresh
+    // was missed (phone off, no Wi-Fi at the time), and repaints when the next one lands
+    // while the app is open. Both use the server's scheduled snapshot, not a new fetch.
+    private val slotHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val slotTick = Runnable { catchUpWithSchedule() }
+
+    override fun onResume() {
+        super.onResume()
+        ScheduledRefresh.schedule(this)
+        catchUpWithSchedule()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        slotHandler.removeCallbacks(slotTick)
+    }
+
+    private fun catchUpWithSchedule() {
+        slotHandler.removeCallbacks(slotTick)
+        val wait = ScheduledRefresh.nextSlotMillis() + 90_000L - System.currentTimeMillis()
+        slotHandler.postDelayed(slotTick, wait.coerceAtLeast(5_000L))
+        if (!ScheduledRefresh.isBehind(this)) {
+            renderFromCache()
+            return
+        }
+        Thread {
+            ScheduledRefresh.runBlocking(applicationContext)
+            runOnUiThread { if (!isFinishing) renderFromCache() }
+        }.start()
+    }
+
     // Observes every touch the Activity sees (without consuming it — normal scrolling,
     // button taps, and EditText focus/typing all still work exactly as before) purely to
     // feed tabSwipeDetector's fling detection and to remember whether THIS gesture started
@@ -490,7 +521,9 @@ class MainActivity : AppCompatActivity() {
             val snapshot = full.forSource(picked)
             renderSourceChips(full, picked)
             render(snapshot)
-            updatedText.text = "Updated " + WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt)
+            val next = java.time.Instant.ofEpochMilli(ScheduledRefresh.nextSlotMillis()).atZone(java.time.ZoneId.systemDefault())
+                .format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+            updatedText.text = "Updated " + WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt) + " · next " + next
             sourceLabelText.text = snapshot.sourceLabel
             sourceLabelText.visibility = if (snapshot.sourceLabel.isEmpty()) View.GONE else View.VISIBLE
             val pickedMissing = picked != SourcePreference.AVERAGE && full.bySource.isNotEmpty() && picked !in full.bySource
@@ -628,7 +661,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Fetches one location from the server and caches it. Returns an error message, or null on success. */
     private fun fetchOne(locationId: String, lat: Double, lon: Double, cityName: String?): String? =
-        when (val outcome = WeatherClient.fetchWeather(locationId, cityName, lat, lon)) {
+        when (val outcome = WeatherClient.fetchWeather(locationId, cityName, lat, lon, fresh = true)) {
             is WeatherClient.Outcome.Ok -> {
                 WeatherCache.save(this, locationId, outcome.value.copy(cityName = cityName ?: outcome.value.cityName))
                 null

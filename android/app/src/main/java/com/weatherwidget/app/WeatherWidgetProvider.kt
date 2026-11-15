@@ -26,10 +26,9 @@ import kotlin.math.roundToInt
 private enum class WidgetSizeTier { COMPACT, FULL }
 
 /**
- * The widget's brain. There is no periodic timer at all (see
- * weather_widget_info.xml's updatePeriodMillis="0") — the ONLY thing that
- * ever triggers a network fetch is the user tapping the widget, handled in
- * onReceive() below. onUpdate() and onAppWidgetOptionsChanged() (called on
+ * The widget's brain. A tap fetches fresh weather (onReceive() below); the
+ * only other update is the 3-hour schedule in ScheduledRefresh.kt, which
+ * repaints every widget after it runs. onUpdate() and onAppWidgetOptionsChanged() (called on
  * first placement, reboot, and resize) only ever repaint from whatever is
  * already cached.
  */
@@ -99,7 +98,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
 
                 WeatherCache.saveCurrentCoords(context, location.latitude, location.longitude)
                 val cityName = GeocodeHelper.cityName(context, location)
-                val outcome = WeatherClient.fetchWeather(locationId, cityName, location.latitude, location.longitude)
+                val outcome = WeatherClient.fetchWeather(locationId, cityName, location.latitude, location.longitude, fresh = true)
                 finishRefresh(context, manager, id, locationId, cached, outcome, cityName)
             } else {
                 val saved = LocationStore.list(context).find { it.id == locationId }
@@ -112,7 +111,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                 val cached = WeatherCache.read(context, locationId)?.forSource(SourcePreference.get(context))
                 manager.updateAppWidget(id, buildViews(context, manager, id, locationId, cached, context.getString(R.string.widget_loading)))
 
-                val outcome = WeatherClient.fetchWeather(locationId, saved.displayName, saved.lat, saved.lon)
+                val outcome = WeatherClient.fetchWeather(locationId, saved.displayName, saved.lat, saved.lon, fresh = true)
                 finishRefresh(context, manager, id, locationId, cached, outcome, saved.displayName)
             }
         }
@@ -479,6 +478,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        ScheduledRefresh.schedule(context)
         appWidgetIds.forEach { renderFromCache(context, appWidgetManager, it) }
     }
 
