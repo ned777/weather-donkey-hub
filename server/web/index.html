@@ -63,11 +63,12 @@
   .label { color: var(--dim); font-size: 13.5px; letter-spacing: .12em; text-transform: uppercase; }
 
   /* ---------- now ---------- */
-  .hero { display: grid; grid-template-columns: auto 1fr; gap: 6px 28px; align-items: center; padding: 14px 18px 10px; }
+  /* Temperature + condition stay together as one centered group at every width. */
+  .hero { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 6px 36px; align-items: center; padding: 14px 18px 10px; }
   .hero .left { text-align: center; }
   .today { color: var(--teal); font-weight: 700; letter-spacing: .1em; font-size: 15px; }
   .temp { font-weight: 800; line-height: .95; color: transparent; -webkit-text-stroke: 4px var(--cyan);
-    font-size: clamp(96px, 9vw, 150px); white-space: nowrap; }
+    font-size: min(150px, 36vw); white-space: nowrap; } /* full size; only shrinks on very narrow screens */
   .place { color: var(--dim); font-size: 13.5px; margin-top: 2px; }
   .cond { display: flex; align-items: center; gap: 10px; }
   .cond svg { width: 44px; height: 44px; }
