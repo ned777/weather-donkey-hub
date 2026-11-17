@@ -37,7 +37,7 @@ private enum class WidgetSizeTier { COMPACT, FULL }
 // screen the user is looking at (that's what MainActivity is). Home-screen widgets
 // don't run continuously; Android calls into this class only at specific moments:
 // when a widget is first placed, resized, removed, or (via onReceive below) tapped.
-class WeatherWidgetProvider : AppWidgetProvider() {
+open class WeatherWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_REFRESH = "com.weatherwidget.app.ACTION_REFRESH"
@@ -50,8 +50,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
          */
         fun repaintAllWidgets(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(ComponentName(context, WeatherWidgetProvider::class.java))
-            ids.forEach { renderFromCache(context, manager, it) }
+            allWidgetIds(context, manager).forEach { renderFromCache(context, manager, it) }
         }
 
         /** Called by WeatherWidgetConfigActivity right after binding a location to a brand-new widget id. */
@@ -158,7 +157,16 @@ class WeatherWidgetProvider : AppWidgetProvider() {
         // of instructions ("set this TextView's text to X", "set this view's size to Y")
         // that gets handed across to the launcher process, which then actually applies
         // them and draws the result.
+        /** Every placed widget of both sizes: the 2x2 and the 4x2 wide one (a subclass of this provider). */
+        private fun allWidgetIds(context: Context, manager: AppWidgetManager): IntArray =
+            manager.getAppWidgetIds(ComponentName(context, WeatherWidgetProvider::class.java)) +
+                manager.getAppWidgetIds(ComponentName(context, WeatherWideWidgetProvider::class.java))
+
+        private fun isWide(manager: AppWidgetManager, id: Int): Boolean =
+            manager.getAppWidgetInfo(id)?.provider?.className == WeatherWideWidgetProvider::class.java.name
+
         private fun buildViews(context: Context, manager: AppWidgetManager, id: Int, locationId: String, snapshot: WeatherSnapshot?, statusText: String): RemoteViews {
+            if (isWide(manager, id)) return buildWideViews(context, manager, id, locationId, snapshot, statusText)
             val views = RemoteViews(context.packageName, R.layout.widget_weather)
             WidgetCorners.apply(views, R.id.weatherWidgetRoot, manager, id)
             val fahrenheit = UnitPreference.isFahrenheit(context)
@@ -240,6 +248,88 @@ class WeatherWidgetProvider : AppWidgetProvider() {
         // The city header is narrow — a long name gets a hard character-count
         // truncation ("San Francisco" -> "San Fran..") on top of (not instead of) the
         // normal width-based fit-sizing/ellipsize. 8 chars + ".." = 10 chars max.
+        private val WIDE_STAT_LABELS = intArrayOf(R.id.wideStat0Label, R.id.wideStat1Label, R.id.wideStat2Label, R.id.wideStat3Label)
+        private val WIDE_STAT_VALUES = intArrayOf(R.id.wideStat0Value, R.id.wideStat1Value, R.id.wideStat2Value, R.id.wideStat3Value)
+        private val WIDE_HOUR_TIMES = intArrayOf(R.id.wideHour0Time, R.id.wideHour1Time, R.id.wideHour2Time, R.id.wideHour3Time, R.id.wideHour4Time, R.id.wideHour5Time)
+        private val WIDE_HOUR_ICONS = intArrayOf(R.id.wideHour0Icon, R.id.wideHour1Icon, R.id.wideHour2Icon, R.id.wideHour3Icon, R.id.wideHour4Icon, R.id.wideHour5Icon)
+        private val WIDE_HOUR_TEMPS = intArrayOf(R.id.wideHour0Temp, R.id.wideHour1Temp, R.id.wideHour2Temp, R.id.wideHour3Temp, R.id.wideHour4Temp, R.id.wideHour5Temp)
+        private val WIDE_HOUR_RAIN = intArrayOf(R.id.wideHour0Rain, R.id.wideHour1Rain, R.id.wideHour2Rain, R.id.wideHour3Rain, R.id.wideHour4Rain, R.id.wideHour5Rain)
+
+        /**
+         * The 4x2 wide widget (widget_weather_wide.xml): header with the city and
+         * today's date, a hero row (condition icon, glowing temperature, condition,
+         * high/low, sunrise/sunset, then feels-like / rain / wind / humidity), the
+         * next 12 hours every 2 hours, and a one-line refresh strip. Uses the same
+         * root/refresh view ids as the 2x2 so setClickIntent() and the
+         * "Updating…" swap work unchanged.
+         */
+        private fun buildWideViews(context: Context, manager: AppWidgetManager, id: Int, locationId: String, snapshot: WeatherSnapshot?, statusText: String): RemoteViews {
+            val views = RemoteViews(context.packageName, R.layout.widget_weather_wide)
+            WidgetCorners.apply(views, R.id.weatherWidgetRoot, manager, id)
+            val fahrenheit = UnitPreference.isFahrenheit(context)
+
+            val city = snapshot?.cityName
+                ?: if (locationId == WeatherCache.CURRENT_LOCATION_ID) context.getString(R.string.current_location)
+                else LocationStore.list(context).find { it.id == locationId }?.displayName ?: context.getString(R.string.current_location)
+            views.setTextViewText(R.id.wideCityText, city)
+            val today = java.time.LocalDate.now()
+            views.setTextViewText(
+                R.id.wideDateText,
+                "${today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} · " +
+                    "${today.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} ${today.dayOfMonth}"
+                        .uppercase()
+            )
+
+            val tempStr = snapshot?.let { WeatherFormat.tempString(it.tempF, fahrenheit) } ?: "--°"
+            views.setTextViewText(R.id.wideTempText, tempStr)
+            // 50sp, shrunk only if a 3-digit / negative reading wouldn't fit its ~96dp slot.
+            setSp(context, views, R.id.wideTempText, fitWidthSp(context, tempStr, dpToPx(context, 96).toFloat(), 50f, 30f, bold = true))
+            views.setImageViewResource(R.id.wideIcon, (snapshot?.condition ?: WeatherCondition.CLOUDY).iconRes(snapshot?.isDay ?: true))
+            views.setTextViewText(R.id.wideConditionText, snapshot?.condition?.label ?: "--")
+            views.setTextViewText(
+                R.id.wideHighLowText,
+                snapshot?.let { WeatherFormat.highLowString(it.todayHighF, it.todayLowF, fahrenheit) } ?: "H:--°  L:--°"
+            )
+            views.setTextViewText(
+                R.id.wideSunText,
+                snapshot?.let { "↑${WeatherFormat.clockTime(it.sunrise)}  ↓${WeatherFormat.clockTime(it.sunset)}" } ?: "↑--:--  ↓--:--"
+            )
+
+            val d = snapshot?.details
+            val wind = snapshot?.let { s ->
+                val dir = d?.windDir?.let { " " + WeatherFormat.compass(it) } ?: ""
+                "${Math.round(s.windSpeedMph)} mph$dir"
+            } ?: "--"
+            val stats = listOf(
+                "Feels" to (d?.feelsLikeF?.let { WeatherFormat.tempString(it, fahrenheit) } ?: "--"),
+                "Rain" to (snapshot?.let { WeatherFormat.rainPct(it.todayRainChancePercent) } ?: "--"),
+                "Wind" to wind,
+                "Humidity" to WeatherFormat.pct(d?.humidity)
+            )
+            stats.forEachIndexed { i, (label, value) ->
+                views.setTextViewText(WIDE_STAT_LABELS[i], label)
+                views.setTextViewText(WIDE_STAT_VALUES[i], value)
+            }
+
+            // Next 12 hours, every other hour (hourly[0] is the coming hour).
+            for (i in 0 until 6) {
+                val hour = snapshot?.hourly?.getOrNull(i * 2)
+                views.setTextViewText(WIDE_HOUR_TIMES[i], hour?.time?.substringAfter('T')?.take(5) ?: "--:--")
+                views.setImageViewResource(WIDE_HOUR_ICONS[i], (hour?.condition ?: WeatherCondition.CLOUDY).iconRes(hour?.isDay ?: true))
+                views.setTextViewText(WIDE_HOUR_TEMPS[i], hour?.let { WeatherFormat.tempString(it.tempF, fahrenheit) } ?: "--°")
+                val rain = hour?.rainChancePercent ?: 0
+                views.setTextViewText(WIDE_HOUR_RAIN[i], if (rain >= 10) "$rain%" else "")
+            }
+
+            views.setTextViewText(R.id.updatedText, statusText)
+            val updating = statusText == context.getString(R.string.widget_loading)
+            views.setViewVisibility(R.id.refreshLines, if (updating) View.INVISIBLE else View.VISIBLE)
+            views.setViewVisibility(R.id.updatingText, if (updating) View.VISIBLE else View.GONE)
+
+            setClickIntent(context, views, id, locationId)
+            return views
+        }
+
         private fun widgetCityLabel(name: String): String =
             if (name.length > 8) name.take(8) + ".." else name
 
@@ -529,8 +619,7 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                     } else {
                         // Defensive fallback only — every ACTION_REFRESH we send ourselves
                         // always carries EXTRA_APPWIDGET_ID (see setClickIntent).
-                        val ids = manager.getAppWidgetIds(ComponentName(context, WeatherWidgetProvider::class.java))
-                        ids.forEach { performRefresh(context, manager, it) }
+                        allWidgetIds(context, manager).forEach { performRefresh(context, manager, it) }
                     }
                 } finally {
                     pending.finish()

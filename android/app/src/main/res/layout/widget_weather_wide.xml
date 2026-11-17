@@ -1,0 +1,586 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The 4x2 "Weather Donkey Wide" widget. Same data, location binding, refresh
+  and caching as the 2x2 widget (it's a subclass of WeatherWidgetProvider; see
+  WeatherWideWidgetProvider and buildWideViews()), laid out for a wide card:
+
+    CARSON                                   TUE · NOV 17
+    [icon]  65°   Cloudy            | Feels       62°
+                  H:69°  L:62°      | Rain        20%
+                  ↑06:25  ↓16:49    | Wind     8 NW
+                                    | Humidity    54%
+    ─────────────────────────────────────────────────
+    15:00  17:00  19:00  21:00  23:00  01:00   (icon, temp, rain%)
+    ↻ REFRESH · 23:19 · Nov 15 · PST
+
+  Tapping the card opens the app; tapping the bottom strip refreshes it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/weatherWidgetRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background_r26_inset"
+    android:paddingTop="16dp"
+    android:paddingBottom="10dp"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp">
+
+    <!-- Header: city on the left, today's date on the right. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            android:id="@+id/wideCityText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:includeFontPadding="false"
+            android:textColor="@color/retro_white"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:textAllCaps="true"
+            android:letterSpacing="0.08"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:text="--" />
+        <TextView
+            android:id="@+id/wideDateText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:textColor="@color/retro_teal"
+            android:textStyle="bold"
+            android:textSize="12sp"
+            android:letterSpacing="0.06"
+            android:singleLine="true"
+            android:text="" />
+    </LinearLayout>
+
+    <!-- Hero row: icon + glowing temperature + condition column | details column. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:baselineAligned="false">
+
+        <ImageView
+            android:id="@+id/wideIcon"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_weather_cloudy" />
+
+        <TextView
+            android:id="@+id/wideTempText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:includeFontPadding="false"
+            android:textColor="@color/retro_cyan"
+            android:textStyle="bold"
+            android:textSize="50sp"
+            android:shadowColor="#9900D9FF"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="14"
+            android:singleLine="true"
+            android:text="--°" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:orientation="vertical">
+            <TextView
+                android:id="@+id/wideConditionText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_yellow"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:shadowColor="#80FFD400"
+                android:shadowDx="0"
+                android:shadowDy="0"
+                android:shadowRadius="10"
+                android:singleLine="true"
+                android:text="--" />
+            <TextView
+                android:id="@+id/wideHighLowText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:singleLine="true"
+                android:text="H:--°  L:--°" />
+            <TextView
+                android:id="@+id/wideSunText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textSize="11sp"
+                android:singleLine="true"
+                android:text="↑--:--  ↓--:--" />
+        </LinearLayout>
+
+        <!-- Thin teal divider. -->
+        <TextView
+            android:layout_width="1dp"
+            android:layout_height="58dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="10dp"
+            android:background="@color/retro_teal_dim" />
+
+        <LinearLayout
+            android:layout_width="104dp"
+            android:layout_height="64dp"
+            android:orientation="vertical">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:id="@+id/wideStat0Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/retro_teal"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:text="--" />
+                <TextView
+                    android:id="@+id/wideStat0Value"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:includeFontPadding="false"
+                    android:gravity="end"
+                    android:textColor="@color/retro_white"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:text="--" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:id="@+id/wideStat1Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/retro_teal"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:text="--" />
+                <TextView
+                    android:id="@+id/wideStat1Value"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:includeFontPadding="false"
+                    android:gravity="end"
+                    android:textColor="@color/retro_white"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:text="--" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:id="@+id/wideStat2Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/retro_teal"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:text="--" />
+                <TextView
+                    android:id="@+id/wideStat2Value"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:includeFontPadding="false"
+                    android:gravity="end"
+                    android:textColor="@color/retro_white"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:text="--" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:id="@+id/wideStat3Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/retro_teal"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:text="--" />
+                <TextView
+                    android:id="@+id/wideStat3Value"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:includeFontPadding="false"
+                    android:gravity="end"
+                    android:textColor="@color/retro_white"
+                    android:textStyle="bold"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:text="--" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Hairline above the hourly strip. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginBottom="5dp"
+        android:background="@color/retro_teal_dim" />
+
+    <!-- Next 12 hours, every 2 hours: time, icon, temp, rain chance. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/wideHour0Time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textSize="10sp"
+                android:text="--" />
+            <ImageView
+                android:id="@+id/wideHour0Icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="3dp"
+                android:layout_marginBottom="2dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_weather_cloudy" />
+            <TextView
+                android:id="@+id/wideHour0Temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideHour0Rain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_cyan"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/wideHour1Time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textSize="10sp"
+                android:text="--" />
+            <ImageView
+                android:id="@+id/wideHour1Icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="3dp"
+                android:layout_marginBottom="2dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_weather_cloudy" />
+            <TextView
+                android:id="@+id/wideHour1Temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideHour1Rain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_cyan"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/wideHour2Time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textSize="10sp"
+                android:text="--" />
+            <ImageView
+                android:id="@+id/wideHour2Icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="3dp"
+                android:layout_marginBottom="2dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_weather_cloudy" />
+            <TextView
+                android:id="@+id/wideHour2Temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideHour2Rain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_cyan"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/wideHour3Time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textSize="10sp"
+                android:text="--" />
+            <ImageView
+                android:id="@+id/wideHour3Icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="3dp"
+                android:layout_marginBottom="2dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_weather_cloudy" />
+            <TextView
+                android:id="@+id/wideHour3Temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideHour3Rain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_cyan"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/wideHour4Time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textSize="10sp"
+                android:text="--" />
+            <ImageView
+                android:id="@+id/wideHour4Icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="3dp"
+                android:layout_marginBottom="2dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_weather_cloudy" />
+            <TextView
+                android:id="@+id/wideHour4Temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideHour4Rain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_cyan"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:text="" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/wideHour5Time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textSize="10sp"
+                android:text="--" />
+            <ImageView
+                android:id="@+id/wideHour5Icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="3dp"
+                android:layout_marginBottom="2dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_weather_cloudy" />
+            <TextView
+                android:id="@+id/wideHour5Temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideHour5Rain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_cyan"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:text="" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Refresh strip: tap HERE to refresh (the rest of the card opens the app). -->
+    <FrameLayout
+        android:id="@+id/refreshArea"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="1dp">
+
+        <LinearLayout
+            android:id="@+id/refreshLines"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+            <TextView
+                android:id="@+id/tapRefreshText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_cyan"
+                android:textStyle="bold"
+                android:textSize="10sp"
+                android:singleLine="true"
+                android:text="@string/widget_wide_refresh" />
+            <TextView
+                android:id="@+id/updatedText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textSize="10sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:text="" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/updatingText"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:textColor="@color/retro_cyan"
+            android:textStyle="bold"
+            android:textSize="11sp"
+            android:singleLine="true"
+            android:text="@string/widget_loading"
+            android:visibility="gone" />
+    </FrameLayout>
+
+</LinearLayout>

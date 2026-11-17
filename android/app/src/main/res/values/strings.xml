@@ -51,6 +51,8 @@
     <string name="drawer_add">+ Add city</string>
     <string name="remove_city_confirm">Remove %1$s?</string>
     <string name="widget_tap_refresh">Tap below to refresh</string>
+    <string name="widget_label_wide">Weather Donkey Wide</string>
+    <string name="widget_wide_refresh">↻ REFRESH  ·  </string>
     <string name="save">Save</string>
     <string name="drawer_sorting">Drag to sort</string>
     <string name="refresh_working">Getting fresh weather from the hub</string>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  4x2 Weather Donkey Wide. Fixed 4 columns by 2 rows (70*N - 30dp: 250dp x
+  110dp), not resizable. Same rules as the 2x2 (weather_widget_info.xml): no
+  OS timer, it only refreshes when its bottom strip is tapped, and the same
+  location picker runs when it's added.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="250dp"
+    android:minResizeHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_weather_wide"
+    android:resizeMode="none"
+    android:configure="com.weatherwidget.app.WeatherWidgetConfigActivity"
+    android:widgetCategory="home_screen" />
