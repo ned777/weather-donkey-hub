@@ -256,7 +256,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         private val WIDE_DAY_RAIN = intArrayOf(R.id.wideDay0Rain, R.id.wideDay1Rain, R.id.wideDay2Rain, R.id.wideDay3Rain, R.id.wideDay4Rain)
 
         /**
-         * The 4x2 wide widget (widget_weather_wide.xml): the city name, a hero row (condition icon, glowing temperature, condition,
+         * The 4x2 wide widget (widget_weather_wide.xml): the city name, a hero row (condition icon, temperature, condition,
          * high/low, then feels-like / rain / wind / humidity), the next 5 days with
          * sunrise/sunset at the end of that row, and a one-line refresh strip. Uses the same
          * root/refresh view ids as the 2x2 so setClickIntent() and the

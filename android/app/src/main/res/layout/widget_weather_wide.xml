@@ -50,7 +50,7 @@
             android:text="--" />
     </LinearLayout>
 
-    <!-- Hero row: icon + glowing temperature + condition column | details column. -->
+    <!-- Hero row: icon + temperature + condition column | details column. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -75,10 +75,6 @@
             android:textColor="@color/retro_cyan"
             android:textStyle="bold"
             android:textSize="50sp"
-            android:shadowColor="#9900D9FF"
-            android:shadowDx="0"
-            android:shadowDy="0"
-            android:shadowRadius="14"
             android:singleLine="true"
             android:text="--°" />
 
@@ -96,10 +92,6 @@
                 android:textColor="@color/retro_yellow"
                 android:textStyle="bold"
                 android:textSize="16sp"
-                android:shadowColor="#80FFD400"
-                android:shadowDx="0"
-                android:shadowDy="0"
-                android:shadowRadius="10"
                 android:singleLine="true"
                 android:text="--" />
             <TextView
