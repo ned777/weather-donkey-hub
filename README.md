@@ -70,6 +70,26 @@ everything from it, on home Wi‑Fi or away from home through a VPN into the
 home network. With no route home, they keep showing the last weather they
 loaded, with *"Server unreachable"*.
 
+## Home-screen widgets
+
+Two widgets, both listed under **Weather Donkey** in the widget picker. Each asks which location to show when you add it (Current or a saved city), follows the app's °F/°C and source choice, and has no timer.
+
+- **Weather Donkey** (2×2): city, current temperature with today's high/low, the condition, sunrise/sunset, and the next two days.
+- **Weather Donkey Wide** (4×2), same black card with a teal border:
+    - **Top:** the city name, centered.
+    - **Middle:** the current temperature (big, cyan) beside the condition (yellow) and today's high/low, centered left of a thin divider; right of it, **Feels**, **Rain**, **Wind** (speed and direction) and **Humidity**.
+    - **Bottom:** the next 5 days, each the day name over its high (white) over its low (dimmed), then sunrise ↑ and sunset ↓ stacked at the end of the row.
+    - **Footer:** **↻ REFRESH · last updated**.
+    - No icons or rain chances on this one. It's a quick temperature glance, and the app has the details.
+
+Both widgets:
+
+- **Tapping:** the bottom strip refreshes that widget's location through the server (it shows **Updating…** while it works); anywhere else opens the app.
+- **Forecast days that have already passed are skipped.** The forecast is stored from the day after it was fetched, so with an old cache (phone away from home with no VPN) the 5-day row starts at the next day still ahead and leaves the rest blank, instead of showing past days. A refresh on the home network fills it again.
+- **Repaint after an app update.** The launcher shows a widget's bare `--` layout after the app is reinstalled, so the app repaints every widget from cache as soon as it's updated (`MY_PACKAGE_REPLACED`).
+
+The wide widget is `WeatherWideWidgetProvider`, a subclass of `WeatherWidgetProvider`, so it shares all the fetch, cache, location and tap code; `buildViews()` draws `widget_weather_wide.xml` when the widget id belongs to it.
+
 ## Screenshots
 
 <p>
