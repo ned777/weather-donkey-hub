@@ -57,7 +57,8 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
   both formulas, and tricks for converting in your head), and location management. You can save a city by name or US ZIP code to view it, remove a
   city, or move Home if the server moves.
   On a narrow window the city tabs wrap onto extra rows (and scroll up/down if
-  there are many), and every scrollbar on the page is big and yellow so it's easy to spot.
+  there are many), and every scrollbar on the page is big (20px) and orange. The up/down bars (page and tabs)
+  are drawn by the page itself so they never fade away; sideways ones may fade.
 - **Keeps the app and the web page in sync.** Cities added or removed on either
   one carry over to the other on the app's next pull-to-refresh.
 - **Finds history for any spot.** Lookups within 10 km of Home use the

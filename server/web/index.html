@@ -16,14 +16,30 @@
     font-family: Roboto, "Segoe UI", system-ui, -apple-system, sans-serif; font-size: 15.5px; }
   button { font: inherit; }
 
-  /* ---------- scrollbars: big, always-shown yellow (not teal, so it doesn't blend with the card outlines) ---------- */
-  /* Firefox only: Chrome drops the bigger ::-webkit-scrollbar look if these are set. */
-  @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: auto; scrollbar-color: var(--yellow) #2A2A3A; } }
-  ::-webkit-scrollbar { width: 16px; height: 16px; }
-  ::-webkit-scrollbar-track { background: #2A2A3A; border-radius: 8px; }
-  ::-webkit-scrollbar-thumb { background: var(--yellow); border-radius: 8px; border: 3px solid #2A2A3A; min-height: 40px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--white); }
-  ::-webkit-scrollbar-corner { background: #2A2A3A; }
+  /* ---------- scrollbars: big and ORANGE (stands out from the teal card outlines) ----------
+     Vertical: the page and the city tabs get a hand-drawn bar (.vbar) that is ALWAYS shown;
+     the browser's own vertical bar is hidden because Firefox on Mint fades it away
+     (overlay scrollbars) and a page can't turn that off.
+     Horizontal: the browser's own bar, same 20px size and color; it may fade, that's fine. */
+  :root { --sb: #FF8C1A; --sb-track: #2A2A3A; --sb-size: 20px; }
+  @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: auto; scrollbar-color: var(--sb) var(--sb-track); } }
+  ::-webkit-scrollbar { width: var(--sb-size); height: var(--sb-size); }
+  ::-webkit-scrollbar-track { background: var(--sb-track); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--sb); border-radius: 10px; border: 3px solid var(--sb-track); min-width: 48px; }
+  ::-webkit-scrollbar-thumb:hover { background: #FFB066; }
+  ::-webkit-scrollbar-corner { background: var(--sb-track); }
+  html, .tabs { scrollbar-width: none; }
+  html::-webkit-scrollbar, .tabs::-webkit-scrollbar { display: none; }
+  .vbar { position: absolute; top: 0; right: 0; bottom: 0; width: var(--sb-size); background: var(--sb-track);
+    border-radius: 10px; z-index: 50; cursor: pointer; touch-action: none; }
+  .vbar[hidden] { display: none; }
+  .vbar i { position: absolute; left: 3px; right: 3px; min-height: 48px; background: var(--sb); border-radius: 8px; cursor: grab; }
+  .vbar i:hover, .vbar.drag i { background: #FFB066; }
+  .vbar.drag i { cursor: grabbing; }
+  #pageBar { position: fixed; top: 2px; bottom: 2px; right: 2px; }
+  html.has-vbar body { padding-right: calc(var(--sb-size) + 4px); }
+  .tabs-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+  .tabs-wrap.has-vbar .tabs { padding-right: calc(var(--sb-size) + 6px); }
   .page { max-width: 1680px; margin: 0 auto; padding: 14px 24px 32px; }
 
   /* ---------- top bar ---------- */
@@ -34,7 +50,7 @@
   .brand p { color: var(--dim); font-style: italic; font-weight: 600; margin: 1px 0 0; font-size: 13px; }
   /* City tabs wrap onto extra rows instead of hiding off to the side; if there are many,
      the box scrolls up/down (mouse wheel works) with the big scrollbar below. */
-  .tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; flex: 1 1 auto; min-width: 0;
+  .tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 0;
     max-height: 132px; overflow-y: auto; overflow-x: hidden; }
   .tabs button { flex: 0 0 auto; background: none; border: 0; color: var(--dim); font-weight: 700;
     letter-spacing: .08em; text-transform: uppercase; font-size: 14.5px; padding: 9px 12px;
@@ -355,7 +371,7 @@
     header { flex-wrap: wrap; gap: 8px; }
     .brand { flex: 1 1 auto; }
     .clock { display: none; }
-    .tabs { order: 3; flex-basis: 100%; }
+    .tabs-wrap { order: 3; flex-basis: 100%; }
     .c-locs { grid-column: span 12; }
     .conv-grid { grid-template-columns: 1fr; } .conv-grid .cv-col + .cv-col { border-left: 0; border-top: 1px solid var(--line); }
     .hero { gap: 6px 18px; padding: 12px 10px 10px; }
@@ -382,7 +398,7 @@
       <div class="logo" id="logo"></div>
       <div><h1>Weather Donkey</h1><p>Created by Ned Nguyen</p></div>
     </div>
-    <nav class="tabs" id="tabs"></nav>
+    <div class="tabs-wrap"><nav class="tabs" id="tabs"></nav></div>
     <div class="clock" id="clock"></div>
     <div class="units"><button id="unitF" class="active">°F</button><button id="unitC">°C</button></div>
   </header>
@@ -1195,6 +1211,51 @@ loadOtd();
   }
   scheduleNext();
 })();
+
+// ---- always-visible vertical scrollbars ------------------------------------------
+// box = the element that scrolls (document.scrollingElement for the page); host = where the bar sits.
+function vScrollbar(box, host, bar, isPage) {
+  const thumb = document.createElement("i"); bar.appendChild(thumb);
+  const view = () => isPage ? window.innerHeight : box.clientHeight;
+  function update() {
+    const total = box.scrollHeight, seen = view(), scrollable = total - seen > 1;
+    bar.hidden = !scrollable;
+    host.classList.toggle("has-vbar", scrollable);
+    if (!scrollable) return;
+    const track = bar.clientHeight, h = Math.max(48, track * seen / total);
+    thumb.style.height = h + "px";
+    thumb.style.top = (track - h) * (box.scrollTop / (total - seen)) + "px";
+  }
+  let drag = null;
+  thumb.addEventListener("pointerdown", e => {
+    e.preventDefault(); e.stopPropagation(); thumb.setPointerCapture(e.pointerId);
+    drag = { y: e.clientY, top: box.scrollTop }; bar.classList.add("drag");
+  });
+  thumb.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const range = bar.clientHeight - thumb.offsetHeight;
+    box.scrollTop = drag.top + (e.clientY - drag.y) * (box.scrollHeight - view()) / Math.max(1, range);
+  });
+  const stop = () => { drag = null; bar.classList.remove("drag"); };
+  thumb.addEventListener("pointerup", stop); thumb.addEventListener("pointercancel", stop);
+  bar.addEventListener("pointerdown", e => {   // click the track: jump a page that way
+    if (e.target !== bar) return;
+    const up = e.clientY < thumb.getBoundingClientRect().top;
+    box.scrollBy({ top: (up ? -1 : 1) * view() * 0.9, behavior: "smooth" });
+  });
+  (isPage ? window : box).addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  const ro = new ResizeObserver(update); ro.observe(isPage ? document.body : box);
+  if (!isPage) new MutationObserver(update).observe(box, { childList: true, subtree: true });
+  update();
+}
+(() => {
+  const pageBar = document.createElement("div"); pageBar.className = "vbar"; pageBar.id = "pageBar";
+  document.body.appendChild(pageBar);
+  vScrollbar(document.scrollingElement, document.documentElement, pageBar, true);
+  const tabs = $("tabs"), wrap = tabs.parentElement, tabBar = document.createElement("div");
+  tabBar.className = "vbar"; wrap.appendChild(tabBar);
+  vScrollbar(tabs, wrap, tabBar, false);
+})();
 </script>
-</body>
 </html>
