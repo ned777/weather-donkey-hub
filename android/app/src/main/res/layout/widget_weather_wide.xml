@@ -11,7 +11,7 @@
                                     | Humidity    54%
     ─────────────────────────────────────────────────
     WED   THU   FRI   SAT   SUN  |  ↑ 06:25
-    icon, high/low, rain%        |  ↓ 16:49
+    icon, high/low               |  ↓ 16:49
     ↻ REFRESH · 23:19 · Nov 15 · PST
 
   Tapping the card opens the app; tapping the bottom strip refreshes it.
@@ -245,7 +245,7 @@
         android:layout_marginBottom="5dp"
         android:background="@color/retro_teal_dim" />
 
-    <!-- Next 5 days (day, icon, high/low, rain chance), then sunrise/sunset in the same row. -->
+    <!-- Next 5 days (day, icon, high/low), then sunrise/sunset in the same row. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -286,16 +286,6 @@
                 android:textSize="11sp"
                 android:singleLine="true"
                 android:text="--/--" />
-            <TextView
-                android:id="@+id/wideDay0Rain"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_cyan"
-                android:textStyle="bold"
-                android:textSize="9sp"
-                android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -331,16 +321,6 @@
                 android:textSize="11sp"
                 android:singleLine="true"
                 android:text="--/--" />
-            <TextView
-                android:id="@+id/wideDay1Rain"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_cyan"
-                android:textStyle="bold"
-                android:textSize="9sp"
-                android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -376,16 +356,6 @@
                 android:textSize="11sp"
                 android:singleLine="true"
                 android:text="--/--" />
-            <TextView
-                android:id="@+id/wideDay2Rain"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_cyan"
-                android:textStyle="bold"
-                android:textSize="9sp"
-                android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -421,16 +391,6 @@
                 android:textSize="11sp"
                 android:singleLine="true"
                 android:text="--/--" />
-            <TextView
-                android:id="@+id/wideDay3Rain"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_cyan"
-                android:textStyle="bold"
-                android:textSize="9sp"
-                android:text="" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -466,16 +426,6 @@
                 android:textSize="11sp"
                 android:singleLine="true"
                 android:text="--/--" />
-            <TextView
-                android:id="@+id/wideDay4Rain"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_cyan"
-                android:textStyle="bold"
-                android:textSize="9sp"
-                android:text="" />
         </LinearLayout>
 
         <TextView

@@ -254,7 +254,6 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         private val WIDE_DAY_LABELS = intArrayOf(R.id.wideDay0Label, R.id.wideDay1Label, R.id.wideDay2Label, R.id.wideDay3Label, R.id.wideDay4Label)
         private val WIDE_DAY_ICONS = intArrayOf(R.id.wideDay0Icon, R.id.wideDay1Icon, R.id.wideDay2Icon, R.id.wideDay3Icon, R.id.wideDay4Icon)
         private val WIDE_DAY_TEMPS = intArrayOf(R.id.wideDay0Temp, R.id.wideDay1Temp, R.id.wideDay2Temp, R.id.wideDay3Temp, R.id.wideDay4Temp)
-        private val WIDE_DAY_RAIN = intArrayOf(R.id.wideDay0Rain, R.id.wideDay1Rain, R.id.wideDay2Rain, R.id.wideDay3Rain, R.id.wideDay4Rain)
 
         /**
          * The 4x2 wide widget (widget_weather_wide.xml): the city name, a hero row (condition icon, temperature, condition,
@@ -300,7 +299,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(WIDE_STAT_VALUES[i], value)
             }
 
-            // Next 5 days (forecast[0] is tomorrow): day, icon, high/low (low dimmed), rain chance.
+            // Next 5 days still ahead of today: day, icon, high/low (low dimmed). Rain chance is app-only.
             val upcoming = snapshot?.let { upcomingForecast(it) } ?: emptyList()
             for (i in 0 until 5) {
                 val day = upcoming.getOrNull(i)
@@ -317,8 +316,6 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                     text
                 } else if (blank) "" else "--/--"
                 views.setTextViewText(WIDE_DAY_TEMPS[i], temps)
-                val rain = day?.rainChancePercent ?: 0
-                views.setTextViewText(WIDE_DAY_RAIN[i], if (rain >= 10) "$rain%" else "")
             }
 
             // Sunrise / sunset at the end of the forecast row, yellow arrows.
