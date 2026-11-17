@@ -628,6 +628,11 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                     pending.finish()
                 }
             }.start()
+        } else if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            // After an app update the launcher shows each widget's bare initial
+            // layout ("--") until something redraws it; repaint every placed
+            // widget (both sizes) from cache right away.
+            repaintAllWidgets(context)
         } else {
             super.onReceive(context, intent)
         }

@@ -77,6 +77,8 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.weatherwidget.app.ACTION_REFRESH" />
+                <!-- Repaint all widgets from cache after an app update (see onReceive). -->
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
