@@ -5,13 +5,14 @@
   WeatherWideWidgetProvider and buildWideViews()), laid out for a wide card:
 
                         CARSON
-    [icon]  65°   Cloudy            | Feels       62°
+    65°   Cloudy                  | Feels       62°
                   H:69°  L:62°      | Rain        20%
                                     | Wind     8 NW
                                     | Humidity    54%
     ─────────────────────────────────────────────────
     WED   THU   FRI   SAT   SUN  |  ↑ 06:25
-    icon, high/low               |  ↓ 16:49
+    65°   65°   64°   ...        |  ↓ 16:49
+    57°   61°   56°   ... (low, dimmed)
     ↻ REFRESH · 23:19 · Nov 15 · PST
 
   Tapping the card opens the app; tapping the bottom strip refreshes it.
@@ -50,7 +51,7 @@
             android:text="--" />
     </LinearLayout>
 
-    <!-- Hero row: icon + temperature + condition column | details column. -->
+    <!-- Hero row: temperature + condition column | details column. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -59,18 +60,10 @@
         android:gravity="center_vertical"
         android:baselineAligned="false">
 
-        <ImageView
-            android:id="@+id/wideIcon"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
-            android:contentDescription="@null"
-            android:src="@drawable/ic_weather_cloudy" />
-
         <TextView
             android:id="@+id/wideTempText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
             android:includeFontPadding="false"
             android:textColor="@color/retro_cyan"
             android:textStyle="bold"
@@ -245,7 +238,7 @@
         android:layout_marginBottom="5dp"
         android:background="@color/retro_teal_dim" />
 
-    <!-- Next 5 days (day, icon, high/low), then sunrise/sunset in the same row. -->
+    <!-- Next 5 days (day, high, low — no icons), then sunrise/sunset in the same row. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -265,27 +258,31 @@
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_teal"
                 android:textStyle="bold"
-                android:textSize="10sp"
+                android:textSize="13sp"
                 android:letterSpacing="0.06"
                 android:text="--" />
-            <ImageView
-                android:id="@+id/wideDay0Icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginBottom="2dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideDay0Temp"
+                android:id="@+id/wideDay0High"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="11sp"
+                android:textSize="15sp"
                 android:singleLine="true"
-                android:text="--/--" />
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideDay0Low"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:singleLine="true"
+                android:text="--°" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -300,27 +297,31 @@
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_teal"
                 android:textStyle="bold"
-                android:textSize="10sp"
+                android:textSize="13sp"
                 android:letterSpacing="0.06"
                 android:text="--" />
-            <ImageView
-                android:id="@+id/wideDay1Icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginBottom="2dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideDay1Temp"
+                android:id="@+id/wideDay1High"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="11sp"
+                android:textSize="15sp"
                 android:singleLine="true"
-                android:text="--/--" />
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideDay1Low"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:singleLine="true"
+                android:text="--°" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -335,27 +336,31 @@
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_teal"
                 android:textStyle="bold"
-                android:textSize="10sp"
+                android:textSize="13sp"
                 android:letterSpacing="0.06"
                 android:text="--" />
-            <ImageView
-                android:id="@+id/wideDay2Icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginBottom="2dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideDay2Temp"
+                android:id="@+id/wideDay2High"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="11sp"
+                android:textSize="15sp"
                 android:singleLine="true"
-                android:text="--/--" />
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideDay2Low"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:singleLine="true"
+                android:text="--°" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -370,27 +375,31 @@
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_teal"
                 android:textStyle="bold"
-                android:textSize="10sp"
+                android:textSize="13sp"
                 android:letterSpacing="0.06"
                 android:text="--" />
-            <ImageView
-                android:id="@+id/wideDay3Icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginBottom="2dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideDay3Temp"
+                android:id="@+id/wideDay3High"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="11sp"
+                android:textSize="15sp"
                 android:singleLine="true"
-                android:text="--/--" />
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideDay3Low"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:singleLine="true"
+                android:text="--°" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
@@ -405,27 +414,31 @@
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_teal"
                 android:textStyle="bold"
-                android:textSize="10sp"
+                android:textSize="13sp"
                 android:letterSpacing="0.06"
                 android:text="--" />
-            <ImageView
-                android:id="@+id/wideDay4Icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginBottom="2dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideDay4Temp"
+                android:id="@+id/wideDay4High"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="11sp"
+                android:textSize="15sp"
                 android:singleLine="true"
-                android:text="--/--" />
+                android:text="--°" />
+            <TextView
+                android:id="@+id/wideDay4Low"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white_dim"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:singleLine="true"
+                android:text="--°" />
         </LinearLayout>
 
         <TextView

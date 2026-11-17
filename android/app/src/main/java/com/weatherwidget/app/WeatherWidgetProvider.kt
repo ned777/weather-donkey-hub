@@ -252,11 +252,11 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         private val WIDE_STAT_LABELS = intArrayOf(R.id.wideStat0Label, R.id.wideStat1Label, R.id.wideStat2Label, R.id.wideStat3Label)
         private val WIDE_STAT_VALUES = intArrayOf(R.id.wideStat0Value, R.id.wideStat1Value, R.id.wideStat2Value, R.id.wideStat3Value)
         private val WIDE_DAY_LABELS = intArrayOf(R.id.wideDay0Label, R.id.wideDay1Label, R.id.wideDay2Label, R.id.wideDay3Label, R.id.wideDay4Label)
-        private val WIDE_DAY_ICONS = intArrayOf(R.id.wideDay0Icon, R.id.wideDay1Icon, R.id.wideDay2Icon, R.id.wideDay3Icon, R.id.wideDay4Icon)
-        private val WIDE_DAY_TEMPS = intArrayOf(R.id.wideDay0Temp, R.id.wideDay1Temp, R.id.wideDay2Temp, R.id.wideDay3Temp, R.id.wideDay4Temp)
+        private val WIDE_DAY_HIGHS = intArrayOf(R.id.wideDay0High, R.id.wideDay1High, R.id.wideDay2High, R.id.wideDay3High, R.id.wideDay4High)
+        private val WIDE_DAY_LOWS = intArrayOf(R.id.wideDay0Low, R.id.wideDay1Low, R.id.wideDay2Low, R.id.wideDay3Low, R.id.wideDay4Low)
 
         /**
-         * The 4x2 wide widget (widget_weather_wide.xml): the city name, a hero row (condition icon, temperature, condition,
+         * The 4x2 wide widget (widget_weather_wide.xml): the city name, a hero row (temperature, condition,
          * high/low, then feels-like / rain / wind / humidity), the next 5 days with
          * sunrise/sunset at the end of that row, and a one-line refresh strip. Uses the same
          * root/refresh view ids as the 2x2 so setClickIntent() and the
@@ -276,7 +276,6 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.wideTempText, tempStr)
             // 50sp, shrunk only if a 3-digit / negative reading wouldn't fit its ~96dp slot.
             setSp(context, views, R.id.wideTempText, fitWidthSp(context, tempStr, dpToPx(context, 96).toFloat(), 50f, 30f, bold = true))
-            views.setImageViewResource(R.id.wideIcon, (snapshot?.condition ?: WeatherCondition.CLOUDY).iconRes(snapshot?.isDay ?: true))
             views.setTextViewText(R.id.wideConditionText, snapshot?.condition?.label ?: "--")
             views.setTextViewText(
                 R.id.wideHighLowText,
@@ -299,23 +298,16 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(WIDE_STAT_VALUES[i], value)
             }
 
-            // Next 5 days still ahead of today: day, icon, high/low (low dimmed). Rain chance is app-only.
+            // Next 5 days still ahead of today: day, then high over low (low dimmed). Icons and rain chance are app-only.
             val upcoming = snapshot?.let { upcomingForecast(it) } ?: emptyList()
             for (i in 0 until 5) {
                 val day = upcoming.getOrNull(i)
                 // A loaded snapshot that has run out of days (cached a while ago) leaves
-                // the slot blank rather than a placeholder cloud and "--".
+                // the slot blank rather than placeholder "--".
                 val blank = day == null && snapshot != null
-                views.setViewVisibility(WIDE_DAY_ICONS[i], if (blank) View.INVISIBLE else View.VISIBLE)
                 views.setTextViewText(WIDE_DAY_LABELS[i], day?.dateLabel?.uppercase() ?: if (blank) "" else "--")
-                views.setImageViewResource(WIDE_DAY_ICONS[i], (day?.condition ?: WeatherCondition.CLOUDY).iconRes(true))
-                val temps = if (day != null) {
-                    val hi = WeatherFormat.tempString(day.highF, fahrenheit)
-                    val text = android.text.SpannableString("$hi/${WeatherFormat.tempString(day.lowF, fahrenheit)}")
-                    text.setSpan(android.text.style.ForegroundColorSpan(context.getColor(R.color.retro_white_dim)), hi.length, text.length, 0)
-                    text
-                } else if (blank) "" else "--/--"
-                views.setTextViewText(WIDE_DAY_TEMPS[i], temps)
+                views.setTextViewText(WIDE_DAY_HIGHS[i], day?.let { WeatherFormat.tempString(it.highF, fahrenheit) } ?: if (blank) "" else "--°")
+                views.setTextViewText(WIDE_DAY_LOWS[i], day?.let { WeatherFormat.tempString(it.lowF, fahrenheit) } ?: if (blank) "" else "--°")
             }
 
             // Sunrise / sunset at the end of the forecast row, yellow arrows.
