@@ -187,8 +187,9 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 conditionStr = snapshot.condition.label
                 sunriseStr = "↑ ${WeatherFormat.clockTime(snapshot.sunrise)}"
                 sunsetStr = "↓ ${WeatherFormat.clockTime(snapshot.sunset)}"
-                day1 = snapshot.forecast.getOrNull(0)
-                day2 = snapshot.forecast.getOrNull(1)
+                val upcoming = upcomingForecast(snapshot)
+                day1 = upcoming.getOrNull(0)
+                day2 = upcoming.getOrNull(1)
             } else {
                 // No fetch has happened yet for this widget — still show which location
                 // it's bound to (helpful right after configuring it) if it's not "current".
@@ -300,16 +301,21 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             }
 
             // Next 5 days (forecast[0] is tomorrow): day, icon, high/low (low dimmed), rain chance.
+            val upcoming = snapshot?.let { upcomingForecast(it) } ?: emptyList()
             for (i in 0 until 5) {
-                val day = snapshot?.forecast?.getOrNull(i)
-                views.setTextViewText(WIDE_DAY_LABELS[i], day?.dateLabel?.uppercase() ?: "--")
+                val day = upcoming.getOrNull(i)
+                // A loaded snapshot that has run out of days (cached a while ago) leaves
+                // the slot blank rather than a placeholder cloud and "--".
+                val blank = day == null && snapshot != null
+                views.setViewVisibility(WIDE_DAY_ICONS[i], if (blank) View.INVISIBLE else View.VISIBLE)
+                views.setTextViewText(WIDE_DAY_LABELS[i], day?.dateLabel?.uppercase() ?: if (blank) "" else "--")
                 views.setImageViewResource(WIDE_DAY_ICONS[i], (day?.condition ?: WeatherCondition.CLOUDY).iconRes(true))
                 val temps = if (day != null) {
                     val hi = WeatherFormat.tempString(day.highF, fahrenheit)
                     val text = android.text.SpannableString("$hi/${WeatherFormat.tempString(day.lowF, fahrenheit)}")
                     text.setSpan(android.text.style.ForegroundColorSpan(context.getColor(R.color.retro_white_dim)), hi.length, text.length, 0)
                     text
-                } else "--/--"
+                } else if (blank) "" else "--/--"
                 views.setTextViewText(WIDE_DAY_TEMPS[i], temps)
                 val rain = day?.rainChancePercent ?: 0
                 views.setTextViewText(WIDE_DAY_RAIN[i], if (rain >= 10) "$rain%" else "")
@@ -331,6 +337,19 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
 
             setClickIntent(context, views, id, locationId)
             return views
+        }
+
+        /**
+         * The forecast days still ahead of today. snapshot.forecast starts at the day
+         * after it was fetched, so a snapshot cached a few days ago (phone away from
+         * the home network) would otherwise lead with days already gone — drop those.
+         */
+        private fun upcomingForecast(snapshot: WeatherSnapshot): List<DailyForecast> {
+            val fetchedOn = runCatching { java.time.LocalDate.parse(snapshot.localTime.take(10)) }.getOrElse {
+                java.time.Instant.ofEpochMilli(snapshot.fetchedAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            }
+            val daysSince = java.time.temporal.ChronoUnit.DAYS.between(fetchedOn, java.time.LocalDate.now()).toInt()
+            return snapshot.forecast.drop(daysSince.coerceAtLeast(0))
         }
 
         private fun widgetCityLabel(name: String): String =
