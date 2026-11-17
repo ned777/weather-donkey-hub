@@ -60,6 +60,16 @@
         android:gravity="center_vertical"
         android:baselineAligned="false">
 
+        <!-- Temperature + condition as one group, centered in the space left of the
+             divider so there's no dead gap on either side of it. -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:baselineAligned="false">
+
         <TextView
             android:id="@+id/wideTempText"
             android:layout_width="wrap_content"
@@ -67,15 +77,14 @@
             android:includeFontPadding="false"
             android:textColor="@color/retro_cyan"
             android:textStyle="bold"
-            android:textSize="50sp"
+            android:textSize="60sp"
             android:singleLine="true"
             android:text="--°" />
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="12dp"
             android:orientation="vertical">
             <TextView
                 android:id="@+id/wideConditionText"
@@ -98,6 +107,7 @@
                 android:textSize="12sp"
                 android:singleLine="true"
                 android:text="H:--°  L:--°" />
+        </LinearLayout>
         </LinearLayout>
 
         <!-- Thin teal divider. -->

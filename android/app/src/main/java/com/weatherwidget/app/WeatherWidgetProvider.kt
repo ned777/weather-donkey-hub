@@ -274,8 +274,8 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
 
             val tempStr = snapshot?.let { WeatherFormat.tempString(it.tempF, fahrenheit) } ?: "--°"
             views.setTextViewText(R.id.wideTempText, tempStr)
-            // 50sp, shrunk only if a 3-digit / negative reading wouldn't fit its ~96dp slot.
-            setSp(context, views, R.id.wideTempText, fitWidthSp(context, tempStr, dpToPx(context, 96).toFloat(), 50f, 30f, bold = true))
+            // 60sp, shrunk only if a 3-digit / negative reading wouldn't fit its ~112dp slot.
+            setSp(context, views, R.id.wideTempText, fitWidthSp(context, tempStr, dpToPx(context, 112).toFloat(), 60f, 34f, bold = true))
             views.setTextViewText(R.id.wideConditionText, snapshot?.condition?.label ?: "--")
             views.setTextViewText(
                 R.id.wideHighLowText,
