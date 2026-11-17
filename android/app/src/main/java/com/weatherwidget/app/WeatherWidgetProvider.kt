@@ -250,16 +250,15 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         // normal width-based fit-sizing/ellipsize. 8 chars + ".." = 10 chars max.
         private val WIDE_STAT_LABELS = intArrayOf(R.id.wideStat0Label, R.id.wideStat1Label, R.id.wideStat2Label, R.id.wideStat3Label)
         private val WIDE_STAT_VALUES = intArrayOf(R.id.wideStat0Value, R.id.wideStat1Value, R.id.wideStat2Value, R.id.wideStat3Value)
-        private val WIDE_HOUR_TIMES = intArrayOf(R.id.wideHour0Time, R.id.wideHour1Time, R.id.wideHour2Time, R.id.wideHour3Time, R.id.wideHour4Time, R.id.wideHour5Time)
-        private val WIDE_HOUR_ICONS = intArrayOf(R.id.wideHour0Icon, R.id.wideHour1Icon, R.id.wideHour2Icon, R.id.wideHour3Icon, R.id.wideHour4Icon, R.id.wideHour5Icon)
-        private val WIDE_HOUR_TEMPS = intArrayOf(R.id.wideHour0Temp, R.id.wideHour1Temp, R.id.wideHour2Temp, R.id.wideHour3Temp, R.id.wideHour4Temp, R.id.wideHour5Temp)
-        private val WIDE_HOUR_RAIN = intArrayOf(R.id.wideHour0Rain, R.id.wideHour1Rain, R.id.wideHour2Rain, R.id.wideHour3Rain, R.id.wideHour4Rain, R.id.wideHour5Rain)
+        private val WIDE_DAY_LABELS = intArrayOf(R.id.wideDay0Label, R.id.wideDay1Label, R.id.wideDay2Label, R.id.wideDay3Label, R.id.wideDay4Label)
+        private val WIDE_DAY_ICONS = intArrayOf(R.id.wideDay0Icon, R.id.wideDay1Icon, R.id.wideDay2Icon, R.id.wideDay3Icon, R.id.wideDay4Icon)
+        private val WIDE_DAY_TEMPS = intArrayOf(R.id.wideDay0Temp, R.id.wideDay1Temp, R.id.wideDay2Temp, R.id.wideDay3Temp, R.id.wideDay4Temp)
+        private val WIDE_DAY_RAIN = intArrayOf(R.id.wideDay0Rain, R.id.wideDay1Rain, R.id.wideDay2Rain, R.id.wideDay3Rain, R.id.wideDay4Rain)
 
         /**
-         * The 4x2 wide widget (widget_weather_wide.xml): header with the city and
-         * today's date, a hero row (condition icon, glowing temperature, condition,
-         * high/low, sunrise/sunset, then feels-like / rain / wind / humidity), the
-         * next 12 hours every 2 hours, and a one-line refresh strip. Uses the same
+         * The 4x2 wide widget (widget_weather_wide.xml): the city name, a hero row (condition icon, glowing temperature, condition,
+         * high/low, then feels-like / rain / wind / humidity), the next 5 days with
+         * sunrise/sunset at the end of that row, and a one-line refresh strip. Uses the same
          * root/refresh view ids as the 2x2 so setClickIntent() and the
          * "Updating…" swap work unchanged.
          */
@@ -272,13 +271,6 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 ?: if (locationId == WeatherCache.CURRENT_LOCATION_ID) context.getString(R.string.current_location)
                 else LocationStore.list(context).find { it.id == locationId }?.displayName ?: context.getString(R.string.current_location)
             views.setTextViewText(R.id.wideCityText, city)
-            val today = java.time.LocalDate.now()
-            views.setTextViewText(
-                R.id.wideDateText,
-                "${today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} · " +
-                    "${today.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} ${today.dayOfMonth}"
-                        .uppercase()
-            )
 
             val tempStr = snapshot?.let { WeatherFormat.tempString(it.tempF, fahrenheit) } ?: "--°"
             views.setTextViewText(R.id.wideTempText, tempStr)
@@ -289,10 +281,6 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(
                 R.id.wideHighLowText,
                 snapshot?.let { WeatherFormat.highLowString(it.todayHighF, it.todayLowF, fahrenheit) } ?: "H:--°  L:--°"
-            )
-            views.setTextViewText(
-                R.id.wideSunText,
-                snapshot?.let { "↑${WeatherFormat.clockTime(it.sunrise)}  ↓${WeatherFormat.clockTime(it.sunset)}" } ?: "↑--:--  ↓--:--"
             )
 
             val d = snapshot?.details
@@ -311,15 +299,30 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(WIDE_STAT_VALUES[i], value)
             }
 
-            // Next 12 hours, every other hour (hourly[0] is the coming hour).
-            for (i in 0 until 6) {
-                val hour = snapshot?.hourly?.getOrNull(i * 2)
-                views.setTextViewText(WIDE_HOUR_TIMES[i], hour?.time?.substringAfter('T')?.take(5) ?: "--:--")
-                views.setImageViewResource(WIDE_HOUR_ICONS[i], (hour?.condition ?: WeatherCondition.CLOUDY).iconRes(hour?.isDay ?: true))
-                views.setTextViewText(WIDE_HOUR_TEMPS[i], hour?.let { WeatherFormat.tempString(it.tempF, fahrenheit) } ?: "--°")
-                val rain = hour?.rainChancePercent ?: 0
-                views.setTextViewText(WIDE_HOUR_RAIN[i], if (rain >= 10) "$rain%" else "")
+            // Next 5 days (forecast[0] is tomorrow): day, icon, high/low (low dimmed), rain chance.
+            for (i in 0 until 5) {
+                val day = snapshot?.forecast?.getOrNull(i)
+                views.setTextViewText(WIDE_DAY_LABELS[i], day?.dateLabel?.uppercase() ?: "--")
+                views.setImageViewResource(WIDE_DAY_ICONS[i], (day?.condition ?: WeatherCondition.CLOUDY).iconRes(true))
+                val temps = if (day != null) {
+                    val hi = WeatherFormat.tempString(day.highF, fahrenheit)
+                    val text = android.text.SpannableString("$hi/${WeatherFormat.tempString(day.lowF, fahrenheit)}")
+                    text.setSpan(android.text.style.ForegroundColorSpan(context.getColor(R.color.retro_white_dim)), hi.length, text.length, 0)
+                    text
+                } else "--/--"
+                views.setTextViewText(WIDE_DAY_TEMPS[i], temps)
+                val rain = day?.rainChancePercent ?: 0
+                views.setTextViewText(WIDE_DAY_RAIN[i], if (rain >= 10) "$rain%" else "")
             }
+
+            // Sunrise / sunset at the end of the forecast row, yellow arrows.
+            fun sunLine(arrow: String, iso: String?): CharSequence {
+                val text = android.text.SpannableString("$arrow ${iso?.let { WeatherFormat.clockTime(it) } ?: "--:--"}")
+                text.setSpan(android.text.style.ForegroundColorSpan(context.getColor(R.color.retro_yellow)), 0, arrow.length, 0)
+                return text
+            }
+            views.setTextViewText(R.id.wideSunriseText, sunLine("↑", snapshot?.sunrise))
+            views.setTextViewText(R.id.wideSunsetText, sunLine("↓", snapshot?.sunset))
 
             views.setTextViewText(R.id.updatedText, statusText)
             val updating = statusText == context.getString(R.string.widget_loading)

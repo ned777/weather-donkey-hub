@@ -4,13 +4,14 @@
   and caching as the 2x2 widget (it's a subclass of WeatherWidgetProvider; see
   WeatherWideWidgetProvider and buildWideViews()), laid out for a wide card:
 
-    CARSON                                   TUE · NOV 17
+    CARSON
     [icon]  65°   Cloudy            | Feels       62°
                   H:69°  L:62°      | Rain        20%
-                  ↑06:25  ↓16:49    | Wind     8 NW
+                                    | Wind     8 NW
                                     | Humidity    54%
     ─────────────────────────────────────────────────
-    15:00  17:00  19:00  21:00  23:00  01:00   (icon, temp, rain%)
+    WED   THU   FRI   SAT   SUN  |  ↑ 06:25
+    icon, high/low, rain%        |  ↓ 16:49
     ↻ REFRESH · 23:19 · Nov 15 · PST
 
   Tapping the card opens the app; tapping the bottom strip refreshes it.
@@ -26,7 +27,7 @@
     android:paddingStart="20dp"
     android:paddingEnd="20dp">
 
-    <!-- Header: city on the left, today's date on the right. -->
+    <!-- Header: city name (the date lives in the Today widgets, not here). -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -46,17 +47,6 @@
             android:singleLine="true"
             android:ellipsize="end"
             android:text="--" />
-        <TextView
-            android:id="@+id/wideDateText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:includeFontPadding="false"
-            android:textColor="@color/retro_teal"
-            android:textStyle="bold"
-            android:textSize="12sp"
-            android:letterSpacing="0.06"
-            android:singleLine="true"
-            android:text="" />
     </LinearLayout>
 
     <!-- Hero row: icon + glowing temperature + condition column | details column. -->
@@ -122,16 +112,6 @@
                 android:textSize="12sp"
                 android:singleLine="true"
                 android:text="H:--°  L:--°" />
-            <TextView
-                android:id="@+id/wideSunText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_white_dim"
-                android:textSize="11sp"
-                android:singleLine="true"
-                android:text="↑--:--  ↓--:--" />
         </LinearLayout>
 
         <!-- Thin teal divider. -->
@@ -272,28 +252,31 @@
         android:layout_marginBottom="5dp"
         android:background="@color/retro_teal_dim" />
 
-    <!-- Next 12 hours, every 2 hours: time, icon, temp, rain chance. -->
+    <!-- Next 5 days (day, icon, high/low, rain chance), then sunrise/sunset in the same row. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:baselineAligned="false">
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center_horizontal">
             <TextView
-                android:id="@+id/wideHour0Time"
+                android:id="@+id/wideDay0Label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
-                android:textColor="@color/retro_white_dim"
+                android:textColor="@color/retro_teal"
+                android:textStyle="bold"
                 android:textSize="10sp"
+                android:letterSpacing="0.06"
                 android:text="--" />
             <ImageView
-                android:id="@+id/wideHour0Icon"
+                android:id="@+id/wideDay0Icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_marginTop="3dp"
@@ -301,16 +284,17 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideHour0Temp"
+                android:id="@+id/wideDay0Temp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="13sp"
-                android:text="--°" />
+                android:textSize="11sp"
+                android:singleLine="true"
+                android:text="--/--" />
             <TextView
-                android:id="@+id/wideHour0Rain"
+                android:id="@+id/wideDay0Rain"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
@@ -322,20 +306,22 @@
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center_horizontal">
             <TextView
-                android:id="@+id/wideHour1Time"
+                android:id="@+id/wideDay1Label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
-                android:textColor="@color/retro_white_dim"
+                android:textColor="@color/retro_teal"
+                android:textStyle="bold"
                 android:textSize="10sp"
+                android:letterSpacing="0.06"
                 android:text="--" />
             <ImageView
-                android:id="@+id/wideHour1Icon"
+                android:id="@+id/wideDay1Icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_marginTop="3dp"
@@ -343,16 +329,17 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideHour1Temp"
+                android:id="@+id/wideDay1Temp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="13sp"
-                android:text="--°" />
+                android:textSize="11sp"
+                android:singleLine="true"
+                android:text="--/--" />
             <TextView
-                android:id="@+id/wideHour1Rain"
+                android:id="@+id/wideDay1Rain"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
@@ -364,20 +351,22 @@
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center_horizontal">
             <TextView
-                android:id="@+id/wideHour2Time"
+                android:id="@+id/wideDay2Label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
-                android:textColor="@color/retro_white_dim"
+                android:textColor="@color/retro_teal"
+                android:textStyle="bold"
                 android:textSize="10sp"
+                android:letterSpacing="0.06"
                 android:text="--" />
             <ImageView
-                android:id="@+id/wideHour2Icon"
+                android:id="@+id/wideDay2Icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_marginTop="3dp"
@@ -385,16 +374,17 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideHour2Temp"
+                android:id="@+id/wideDay2Temp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="13sp"
-                android:text="--°" />
+                android:textSize="11sp"
+                android:singleLine="true"
+                android:text="--/--" />
             <TextView
-                android:id="@+id/wideHour2Rain"
+                android:id="@+id/wideDay2Rain"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
@@ -406,20 +396,22 @@
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center_horizontal">
             <TextView
-                android:id="@+id/wideHour3Time"
+                android:id="@+id/wideDay3Label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
-                android:textColor="@color/retro_white_dim"
+                android:textColor="@color/retro_teal"
+                android:textStyle="bold"
                 android:textSize="10sp"
+                android:letterSpacing="0.06"
                 android:text="--" />
             <ImageView
-                android:id="@+id/wideHour3Icon"
+                android:id="@+id/wideDay3Icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_marginTop="3dp"
@@ -427,16 +419,17 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideHour3Temp"
+                android:id="@+id/wideDay3Temp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="13sp"
-                android:text="--°" />
+                android:textSize="11sp"
+                android:singleLine="true"
+                android:text="--/--" />
             <TextView
-                android:id="@+id/wideHour3Rain"
+                android:id="@+id/wideDay3Rain"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
@@ -448,20 +441,22 @@
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center_horizontal">
             <TextView
-                android:id="@+id/wideHour4Time"
+                android:id="@+id/wideDay4Label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
-                android:textColor="@color/retro_white_dim"
+                android:textColor="@color/retro_teal"
+                android:textStyle="bold"
                 android:textSize="10sp"
+                android:letterSpacing="0.06"
                 android:text="--" />
             <ImageView
-                android:id="@+id/wideHour4Icon"
+                android:id="@+id/wideDay4Icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_marginTop="3dp"
@@ -469,16 +464,17 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_weather_cloudy" />
             <TextView
-                android:id="@+id/wideHour4Temp"
+                android:id="@+id/wideDay4Temp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="13sp"
-                android:text="--°" />
+                android:textSize="11sp"
+                android:singleLine="true"
+                android:text="--/--" />
             <TextView
-                android:id="@+id/wideHour4Rain"
+                android:id="@+id/wideDay4Rain"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
@@ -488,47 +484,40 @@
                 android:textSize="9sp"
                 android:text="" />
         </LinearLayout>
+
+        <TextView
+            android:layout_width="1dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="8dp"
+            android:background="@color/retro_teal_dim" />
+
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center_vertical">
             <TextView
-                android:id="@+id/wideHour5Time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_white_dim"
-                android:textSize="10sp"
-                android:text="--" />
-            <ImageView
-                android:id="@+id/wideHour5Icon"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginBottom="2dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_weather_cloudy" />
-            <TextView
-                android:id="@+id/wideHour5Temp"
+                android:id="@+id/wideSunriseText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
                 android:textColor="@color/retro_white"
                 android:textStyle="bold"
                 android:textSize="13sp"
-                android:text="--°" />
+                android:singleLine="true"
+                android:text="↑ --:--" />
             <TextView
-                android:id="@+id/wideHour5Rain"
+                android:id="@+id/wideSunsetText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
+                android:layout_marginTop="6dp"
                 android:includeFontPadding="false"
-                android:textColor="@color/retro_cyan"
+                android:textColor="@color/retro_white"
                 android:textStyle="bold"
-                android:textSize="9sp"
-                android:text="" />
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:text="↓ --:--" />
         </LinearLayout>
     </LinearLayout>
 
