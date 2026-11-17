@@ -15,6 +15,15 @@
   html, body { margin: 0; background: var(--bg); color: var(--white);
     font-family: Roboto, "Segoe UI", system-ui, -apple-system, sans-serif; font-size: 15.5px; }
   button { font: inherit; }
+
+  /* ---------- scrollbars: big, always-shown yellow (not teal, so it doesn't blend with the card outlines) ---------- */
+  /* Firefox only: Chrome drops the bigger ::-webkit-scrollbar look if these are set. */
+  @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: auto; scrollbar-color: var(--yellow) #2A2A3A; } }
+  ::-webkit-scrollbar { width: 16px; height: 16px; }
+  ::-webkit-scrollbar-track { background: #2A2A3A; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--yellow); border-radius: 8px; border: 3px solid #2A2A3A; min-height: 40px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--white); }
+  ::-webkit-scrollbar-corner { background: #2A2A3A; }
   .page { max-width: 1680px; margin: 0 auto; padding: 14px 24px 32px; }
 
   /* ---------- top bar ---------- */
@@ -23,7 +32,10 @@
   .logo { width: 44px; height: 44px; }
   .brand h1 { color: var(--yellow); letter-spacing: .06em; font-size: 21px; margin: 0; line-height: 1.1; }
   .brand p { color: var(--dim); font-style: italic; font-weight: 600; margin: 1px 0 0; font-size: 13px; }
-  .tabs { display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; }
+  /* City tabs wrap onto extra rows instead of hiding off to the side; if there are many,
+     the box scrolls up/down (mouse wheel works) with the big scrollbar below. */
+  .tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; flex: 1 1 auto; min-width: 0;
+    max-height: 132px; overflow-y: auto; overflow-x: hidden; }
   .tabs button { flex: 0 0 auto; background: none; border: 0; color: var(--dim); font-weight: 700;
     letter-spacing: .08em; text-transform: uppercase; font-size: 14.5px; padding: 9px 12px;
     border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 6px; }
@@ -201,7 +213,7 @@
   .srcs b { color: var(--dim); font-weight: 600; } .srcs span { white-space: nowrap; }
 
   /* ---------- 12 hours ---------- */
-  .hours-wrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: #70708C #000; }
+  .hours-wrap { overflow-x: auto; }
   .hours { display: grid; grid-template-columns: repeat(12, minmax(68px, 1fr)); position: relative; min-width: 816px; }
   .hour { text-align: center; padding: 7px 2px 8px; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .hour:last-child { border-right: 0; }
