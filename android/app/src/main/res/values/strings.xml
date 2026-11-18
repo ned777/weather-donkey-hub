@@ -10,7 +10,6 @@
     <string name="widget_need_permission">Tap to allow location</string>
     <string name="widget_loading">Updating from server…</string>
     <string name="widget_server_update">Server update</string>
-    <string name="widget_refresh">Refresh</string>
     <string name="widget_error_no_location">Couldn\'t get location — tap to retry</string>
     <string name="widget_error_server">Server unreachable</string>
     <string name="app_error_server">Can\'t reach the Weather Donkey server — it only works on home Wi‑Fi</string>

@@ -4,7 +4,7 @@
   and caching as the 2x2 widget (it's a subclass of WeatherWidgetProvider; see
   WeatherWideWidgetProvider and buildWideViews()), laid out for a wide card:
 
-    Refresh             CARSON
+    ↻                   CARSON
     65°   Cloudy                  | Feels       62°
                   H:69°  L:62°      | Rain        20%
                                     | Wind     8 NW
@@ -15,7 +15,7 @@
     57°   61°   56°   ... (low, dimmed)
     Server update 23:19 · Nov 15 · PST
 
-  Tapping "Refresh" (top-left) reloads it from the server; the rest of the card opens the app.
+  Tapping ↻ (top-left) reloads it from the server; the rest of the card opens the app.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/weatherWidgetRoot"
@@ -23,21 +23,37 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_background_r26_inset"
-    android:paddingTop="10dp"
+    android:paddingTop="0dp"
     android:paddingBottom="10dp"
     android:paddingStart="20dp"
     android:paddingEnd="20dp">
 
-    <!-- Header: city name centered (the date lives in the Today widgets, not here), with
-         "Refresh" over its left edge — tapping it reloads this widget from the server. -->
-    <FrameLayout
+    <!-- Header: a big ↻ refresh icon top-left (reloads from the server) in a 48x44dp
+         fingertip-sized tap box, the city name centered, and a spacer on the right so the
+         city stays centered. The card has no top padding and the row is 37dp tall, which
+         puts the city name exactly where it was before the icon (10dp padding + its line). -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            android:id="@+id/refreshIcon"
+            android:layout_width="48dp"
+            android:layout_height="37dp"
+            
+            android:layout_marginStart="-10dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:textColor="@color/retro_cyan"
+            android:textStyle="bold"
+            android:textSize="30sp"
+            android:text="↻" />
         <TextView
             android:id="@+id/wideCityText"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
+            android:layout_weight="1"
             android:gravity="center"
             android:includeFontPadding="false"
             android:textColor="@color/retro_white"
@@ -49,17 +65,9 @@
             android:ellipsize="end"
             android:text="--" />
         <TextView
-            android:id="@+id/refreshButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="start|center_vertical"
-            android:paddingEnd="14dp"
-            android:includeFontPadding="false"
-            android:textColor="@color/retro_cyan"
-            android:textStyle="bold"
-            android:textSize="13sp"
-            android:text="@string/widget_refresh" />
-    </FrameLayout>
+            android:layout_width="38dp"
+            android:layout_height="1dp" />
+    </LinearLayout>
 
     <!-- Hero row: temperature + condition column | details column. -->
     <LinearLayout
@@ -498,7 +506,7 @@
     </LinearLayout>
 
     <!-- Status line: "Server update <time>", "Updating from server…" mid-refresh, or an
-         error. Not tappable — refreshing is "Refresh" at the top-left. -->
+         error. Not tappable — refreshing is the ↻ at the top-left. -->
     <TextView
         android:id="@+id/updatedText"
         android:layout_width="match_parent"
