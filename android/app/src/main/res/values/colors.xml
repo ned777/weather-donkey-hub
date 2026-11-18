@@ -19,8 +19,8 @@
     <color name="retro_teal">#00E0B8</color>
     <color name="retro_white">#F5F5FF</color>
     <color name="retro_white_dim">#8C8C99</color>
-    <!-- 35% teal: dividers in the 4x2 wide widget. -->
-    <color name="retro_teal_dim">#5900E0B8</color>
+    <!-- 80% teal: dividers in the 4x2 wide widget. -->
+    <color name="retro_teal_dim">#CC00E0B8</color>
 
     <!-- The app screen's AMOLED card look (same palette as the web page). The widget keeps its own colors. -->
     <color name="app_line">#70708C</color>
