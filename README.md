@@ -27,8 +27,8 @@ that:
   never fetches; it shows the latest scheduled snapshot. ↻ Refresh fetches right away without
   moving the schedule. While it works, the ↻ spins, a bar slides under the Right Now
   header, the numbers dim and the status line says what's happening; it ends with
-  *"Updated just now ✓"*. The phone has no timer: it refreshes only on pull-down or the
-  widget's "Tap below to refresh" strip (the rest of the widget opens the app).
+  *"Updated just now ✓"*. The phone has no timer: it refreshes only on pull-down in the app
+  (which asks: weather sources or weather server) or the widget's ↻ icon (server's latest).
 - **Records the weather for its own location only.** Home is where
   this computer is, and it's recorded from every source that answers into a local SQLite
   database. Saved cities and the phone's **Current** (GPS) tab show live
@@ -81,12 +81,15 @@ Two widgets, both listed under **Weather Donkey** in the widget picker. Each ask
     - **Bottom:** the next 5 days, each the day name over its high (white) over its low (dimmed), then sunrise ↑ and sunset ↓ stacked at the end of the row.
     - **Divider lines** (beside the stats, above the 5 days, beside sunrise/sunset) are bright teal (80%), matching the Today + Calendar widget's divider.
     - Text sizes are shared with the Today + Calendar widget: temperature 60sp = its day number, city 14sp = its weekday.
-    - **Footer:** **↻ REFRESH · last updated**.
+    - **Top-left:** a small cyan **↻** to refresh.
+    - **Footer:** **Server update** and the time the server last got this weather.
     - No icons or rain chances on this one. It's a quick temperature glance, and the app has the details.
 
 Both widgets:
 
-- **Tapping:** the bottom strip refreshes that widget's location through the server (it shows **Updating…** while it works); anywhere else opens the app.
+- **Refreshing:** tap the cyan **↻** at the top-left. It loads the **server's latest update** for that widget's location (it doesn't make the server pull new weather from the sources; pull down in the app for that). While it works the ↻ turns yellow and the bottom line reads **Updating from server…** in cyan, for at least 1.2 s so you can see it happen.
+- **Bottom line:** **Server update 15:00 · Nov 18 · PST**, the time the server last got that weather from the sources, plus a note if it had to use a backup source. It isn't tappable.
+- **Tapping anywhere else** opens the app.
 - **Forecast days that have already passed are skipped.** The forecast is stored from the day after it was fetched, so with an old cache (phone away from home with no VPN) the 5-day row starts at the next day still ahead and leaves the rest blank, instead of showing past days. A refresh on the home network fills it again.
 - **Repaint after an app update.** The launcher shows a widget's bare `--` layout after the app is reinstalled, so the app repaints every widget from cache as soon as it's updated (`MY_PACKAGE_REPLACED`).
 
@@ -185,10 +188,15 @@ date and either a time or "Whole day", tap **Look Up**, and it shows the answer
 for whichever tab is open.
 
 There's no background timer on the phone, and opening the app doesn't refresh.
-Weather refreshes only when you pull down, or tap the widget's **Tap below to refresh** strip (tapping the rest
-of the widget opens the app). While a pull-down refresh is working, a cyan bar and
-*"Getting fresh weather from the hub…"* show under the tabs, then *"Updated just now ✓"*
-(or the error) for a moment. Tap the donkey or the title for the city list:
+Weather refreshes only when you pull down in the app, or tap the **↻** at the widget's top-left (tapping the rest
+of the widget opens the app). Pulling down opens an **Update from…** popup (black, neon pink border) with two buttons:
+**Weather sources** (the server pulls new weather from Open-Meteo, MET Norway & 7Timer! right now) or
+**Weather server** (load the server's latest saved update, fast); Cancel does nothing. While it works, a cyan bar under
+the tabs says what it's doing and from where (*"Server is getting new weather from the sources…"* or
+*"Loading the latest update from the server…"*), then where the weather came from for 4 s:
+*"✓ New weather from Open-Meteo, MET Norway & 7Timer! (via server)"* or
+*"✓ Loaded the server's update from 15:00 · Nov 18 · PST"* (or the error). The line under the weather reads
+**Server update &lt;time&gt;**. Tap the donkey or the title for the city list:
 tap to switch; long-press for sort mode (drag a city from anywhere on its row, ✕ on the right to remove
 with a confirm; ✓ saves the order, ✕ at the top cancels).
 

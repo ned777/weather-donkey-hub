@@ -29,4 +29,6 @@
     <color name="app_faint">#9A9AB0</color>
     <color name="app_rain">#AA33E4FF</color>
     <color name="app_down">#FF5F5F</color>
+    <!-- Neon pink: the pull-down "Update from…" popup border. -->
+    <color name="neon_pink">#FF10F0</color>
 </resources>

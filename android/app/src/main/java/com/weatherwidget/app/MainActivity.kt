@@ -106,10 +106,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var refreshProgress: View
     private lateinit var refreshStatusText: TextView
     private var refreshDots = 0
+    // What the banner says while a refresh runs — depends on where it's coming from.
+    private var refreshWorkingText = ""
+    // The source picked for a pull-down that first had to ask for location permission.
+    private var pendingFreshRefresh = false
     private val refreshTicker = object : Runnable {
         override fun run() {
             refreshDots = (refreshDots + 1) % 4
-            refreshStatusText.text = getString(R.string.refresh_working) + ".".repeat(refreshDots)
+            refreshStatusText.text = refreshWorkingText + ".".repeat(refreshDots)
             refreshStatusText.postDelayed(this, 400)
         }
     }
@@ -196,7 +200,7 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             grantPermissionButton.visibility = if (granted) View.GONE else View.VISIBLE
             if (granted) {
-                startRefresh()
+                startRefresh(fresh = pendingFreshRefresh)
             } else {
                 swipeRefresh.isRefreshing = false
                 updatedText.text = getString(R.string.widget_error_no_location)
@@ -272,7 +276,7 @@ class MainActivity : AppCompatActivity() {
         // A refresh needs a deliberate pull (default is ~64dp), so small downward
         // drift while swiping or scrolling doesn't set one off.
         swipeRefresh.setDistanceToTriggerSync((140 * resources.displayMetrics.density).toInt())
-        swipeRefresh.setOnRefreshListener { startRefresh() }
+        swipeRefresh.setOnRefreshListener { askRefreshSource() }
         setupTempConverter()
 
         grantPermissionButton.setOnClickListener {
@@ -754,7 +758,7 @@ class MainActivity : AppCompatActivity() {
             val snapshot = full.forSource(picked)
             renderSourceChips(full, picked)
             render(snapshot)
-            updatedText.text = "Updated " + WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt)
+            updatedText.text = getString(R.string.widget_server_update) + " " + WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt)
             sourceLabelText.text = snapshot.sourceLabel
             sourceLabelText.visibility = if (snapshot.sourceLabel.isEmpty()) View.GONE else View.VISIBLE
             val pickedMissing = picked != SourcePreference.AVERAGE && full.bySource.isNotEmpty() && picked !in full.bySource
@@ -848,18 +852,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * Pull-down asks where to update from:
+     *  - Weather sources: the server pulls brand-new weather from Open-Meteo, MET Norway
+     *    and 7Timer! right now (fresh=1). The phone never talks to them directly.
+     *  - Weather server: just load the server's latest saved update (its 3-hour schedule
+     *    or the last refresh anyone did) — quick.
+     */
+    private fun askRefreshSource() {
+        var picked = false
+        val view = layoutInflater.inflate(R.layout.dialog_refresh_source, null)
+        val dialog = AlertDialog.Builder(this)
+            .setView(view)
+            .setOnDismissListener { if (!picked) swipeRefresh.isRefreshing = false }
+            .create()
+        fun choose(fresh: Boolean) {
+            picked = true
+            dialog.dismiss()
+            startRefresh(fresh)
+        }
+        view.findViewById<View>(R.id.choiceSources).setOnClickListener { choose(fresh = true) }
+        view.findViewById<View>(R.id.choiceServer).setOnClickListener { choose(fresh = false) }
+        view.findViewById<View>(R.id.choiceCancel).setOnClickListener { dialog.dismiss() }
+        // Our own black/pink card is the whole popup — drop the default dialog box behind it.
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        dialog.show()
+    }
+
+    /**
      * Pull-to-refresh updates EVERY tab at once — Current plus each saved city —
      * with all requests to the server running in parallel. The spinner stops
      * when they've all answered.
      */
-    private fun startRefresh() {
+    private fun startRefresh(fresh: Boolean = false) {
         val hasPermission = LocationHelper.hasPermission(this)
         if (activeLocationId == WeatherCache.CURRENT_LOCATION_ID && !hasPermission) {
             swipeRefresh.isRefreshing = false
+            pendingFreshRefresh = fresh
             requestPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
             return
         }
         swipeRefresh.isRefreshing = true
+        refreshWorkingText = getString(if (fresh) R.string.refresh_working_sources else R.string.refresh_working_server)
         showRefreshStatus(working = true)
         val started = System.currentTimeMillis()
         Thread {
@@ -874,12 +907,12 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         WeatherCache.saveCurrentCoords(this, location.latitude, location.longitude)
                         fetchOne(WeatherCache.CURRENT_LOCATION_ID, location.latitude, location.longitude,
-                            GeocodeHelper.cityName(this, location))?.let { errors[WeatherCache.CURRENT_LOCATION_ID] = it }
+                            GeocodeHelper.cityName(this, location), fresh)?.let { errors[WeatherCache.CURRENT_LOCATION_ID] = it }
                     }
                 }
             }
             LocationStore.list(this).forEach { loc ->
-                workers += Thread { fetchOne(loc.id, loc.lat, loc.lon, loc.displayName)?.let { errors[loc.id] = it } }
+                workers += Thread { fetchOne(loc.id, loc.lat, loc.lon, loc.displayName, fresh)?.let { errors[loc.id] = it } }
             }
             workers.forEach { it.start() }
             workers.forEach { it.join() }
@@ -887,7 +920,7 @@ class MainActivity : AppCompatActivity() {
             Thread.sleep(maxOf(0L, 700L - (System.currentTimeMillis() - started)))
             runOnUiThread {
                 swipeRefresh.isRefreshing = false
-                showRefreshStatus(working = false, error = errors[activeLocationId])
+                showRefreshStatus(working = false, error = errors[activeLocationId], done = doneText(fresh))
                 renderFromCache()
                 errors[activeLocationId]?.let { updatedText.text = it }
                 WeatherWidgetProvider.repaintAllWidgets(this)
@@ -895,9 +928,22 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    /** The banner under the tabs: a sliding bar + "Getting fresh weather…" while the
-     *  server works, then "Updated just now ✓" (or the error) that fades out. */
-    private fun showRefreshStatus(working: Boolean, error: String? = null) {
+    /** "✓ New weather from Open-Meteo, MET Norway & 7Timer! (via server)" or
+     *  "✓ Loaded the server's update from 15:00 · Nov 18 · PST". */
+    private fun doneText(fresh: Boolean): String {
+        if (fresh) {
+            val full = WeatherCache.read(this, activeLocationId)
+            val names = full?.let { f -> f.sourceOrder.filter { f.sourceStatuses[it] == "ok" }.map { f.sourceNames[it] ?: it } }.orEmpty()
+            return if (names.isEmpty()) getString(R.string.refresh_done_sources_generic)
+            else getString(R.string.refresh_done_sources, names.joinToString(", ").replace(Regex(", ([^,]*)$"), " & $1"))
+        }
+        val stamp = WeatherCache.read(this, activeLocationId)?.let { WeatherFormat.lastUpdatedTimestamp(it.fetchedAt) } ?: "--"
+        return getString(R.string.refresh_done_server, stamp)
+    }
+
+    /** The banner under the tabs: a sliding bar + what it's doing and from where while the
+     *  server works, then where the weather came from (or the error), which fades out. */
+    private fun showRefreshStatus(working: Boolean, error: String? = null, done: String? = null) {
         refreshStatusText.removeCallbacks(refreshTicker)
         refreshBanner.removeCallbacks(hideRefreshBanner)
         refreshBanner.animate().cancel()
@@ -907,20 +953,21 @@ class MainActivity : AppCompatActivity() {
         if (working) {
             refreshDots = 0
             refreshStatusText.setTextColor(ContextCompat.getColor(this, R.color.retro_cyan))
-            refreshStatusText.text = getString(R.string.refresh_working)
+            refreshStatusText.text = refreshWorkingText
             refreshStatusText.postDelayed(refreshTicker, 400)
             return
         }
         refreshStatusText.setTextColor(ContextCompat.getColor(this, if (error == null) R.color.retro_cyan else R.color.app_dim))
-        refreshStatusText.text = error ?: getString(R.string.refresh_done)
+        refreshStatusText.text = error ?: done ?: getString(R.string.refresh_done)
         refreshBanner.postDelayed({
             refreshBanner.animate().alpha(0f).setDuration(300).withEndAction(hideRefreshBanner).start()
-        }, if (error == null) 1800L else 4000L)
+        }, 4000L)
     }
 
-    /** Fetches one location from the server and caches it. Returns an error message, or null on success. */
-    private fun fetchOne(locationId: String, lat: Double, lon: Double, cityName: String?): String? =
-        when (val outcome = WeatherClient.fetchWeather(locationId, cityName, lat, lon, fresh = true)) {
+    /** Fetches one location from the server and caches it — [fresh] = the server pulls new
+     *  weather from the sources first. Returns an error message, or null on success. */
+    private fun fetchOne(locationId: String, lat: Double, lon: Double, cityName: String?, fresh: Boolean): String? =
+        when (val outcome = WeatherClient.fetchWeather(locationId, cityName, lat, lon, fresh = fresh)) {
             is WeatherClient.Outcome.Ok -> {
                 WeatherCache.save(this, locationId, outcome.value.copy(cityName = cityName ?: outcome.value.cityName))
                 null

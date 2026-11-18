@@ -28,12 +28,27 @@
     android:paddingStart="20dp"
     android:paddingEnd="20dp">
 
-    <!-- Header: city name, centered (the date lives in the Today widgets, not here). -->
+    <!-- Header: ↻ refresh icon top-left (reloads from the server), city name centered
+         (the date lives in the Today widgets, not here), and an icon-wide spacer on the
+         right so the city stays centered. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical">
+        <TextView
+            android:id="@+id/refreshIcon"
+            android:layout_width="40dp"
+            android:layout_height="32dp"
+            android:layout_marginTop="-8dp"
+            android:layout_marginBottom="-8dp"
+            android:layout_marginStart="-8dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:textColor="@color/retro_cyan"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:text="↻" />
         <TextView
             android:id="@+id/wideCityText"
             android:layout_width="0dp"
@@ -49,6 +64,9 @@
             android:singleLine="true"
             android:ellipsize="end"
             android:text="--" />
+        <TextView
+            android:layout_width="32dp"
+            android:layout_height="1dp" />
     </LinearLayout>
 
     <!-- Hero row: temperature + condition column | details column. -->
@@ -487,55 +505,21 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Refresh strip: tap HERE to refresh (the rest of the card opens the app). -->
-    <FrameLayout
-        android:id="@+id/refreshArea"
+    <!-- Status line: "Server update <time>", "Updating from server…" mid-refresh, or an
+         error. Not tappable — refreshing is the ↻ at the top-left. -->
+    <TextView
+        android:id="@+id/updatedText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:paddingTop="3dp"
-        android:paddingBottom="1dp">
-
-        <LinearLayout
-            android:id="@+id/refreshLines"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center">
-            <TextView
-                android:id="@+id/tapRefreshText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_cyan"
-                android:textStyle="bold"
-                android:textSize="10sp"
-                android:singleLine="true"
-                android:text="@string/widget_wide_refresh" />
-            <TextView
-                android:id="@+id/updatedText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_white_dim"
-                android:textSize="10sp"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:text="" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/updatingText"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:includeFontPadding="false"
-            android:gravity="center"
-            android:textColor="@color/retro_cyan"
-            android:textStyle="bold"
-            android:textSize="11sp"
-            android:singleLine="true"
-            android:text="@string/widget_loading"
-            android:visibility="gone" />
-    </FrameLayout>
+        android:paddingBottom="1dp"
+        android:includeFontPadding="false"
+        android:gravity="center"
+        android:textColor="@color/retro_white_dim"
+        android:textSize="10sp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:text="" />
 
 </LinearLayout>

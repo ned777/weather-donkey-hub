@@ -24,20 +24,44 @@
     android:paddingStart="16dp"
     android:paddingEnd="16dp">
 
-    <!-- City name, centered, white — max 10 chars (see WeatherWidgetProvider.widgetCityLabel()). -->
-    <TextView
-        android:id="@+id/cityText"
+    <!-- Header: city name centered (max 10 chars, see WeatherWidgetProvider.widgetCityLabel()),
+         with the ↻ refresh icon laid over its left edge — tapping ↻ reloads this widget from
+         the server. The icon's tap box is bigger than the glyph; negative margins keep it
+         from making the header taller. -->
+    <FrameLayout
+        android:id="@+id/headerRow"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:includeFontPadding="false"
-        android:textColor="@color/retro_white"
-        android:textStyle="bold"
-        android:letterSpacing="0.04"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textSize="16sp"
-        android:text="@string/current_location" />
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/cityText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:textColor="@color/retro_white"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="16sp"
+            android:text="@string/current_location" />
+
+        <TextView
+            android:id="@+id/refreshIcon"
+            android:layout_width="36dp"
+            android:layout_height="32dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginTop="-8dp"
+            android:layout_marginBottom="-8dp"
+            android:layout_marginStart="-8dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:textColor="@color/retro_cyan"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:text="↻" />
+    </FrameLayout>
 
     <!-- baselineAligned="false" — otherwise Android vertically aligns this row's two
          columns by their FIRST line's text baseline, which visually shoves the "TODAY"
@@ -254,43 +278,14 @@
 
     </LinearLayout>
 
-    <!-- The refresh area: "Tap to refresh" over the status line. Tapping HERE fetches new
-         weather; tapping anywhere else on the widget opens the app. -->
-    <FrameLayout
-        android:id="@+id/refreshArea"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp">
-
-    <!-- The two normal lines. While a refresh runs they turn INVISIBLE (still holding
-         their space) and updatingText shows in that same spot. -->
-    <LinearLayout
-        android:id="@+id/refreshLines"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
-
-    <TextView
-        android:id="@+id/tapRefreshText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:includeFontPadding="false"
-        android:gravity="center"
-        android:textColor="@color/retro_cyan"
-        android:textStyle="bold"
-        android:textSize="10sp"
-        android:maxLines="1"
-        android:text="@string/widget_tap_refresh" />
-
-    <!-- Status line: "Updating…" mid-refresh, a permission/error prompt, or (once loaded)
-         the last-updated time/date/timezone — always showing something, never blank. -->
+    <!-- Status line: "Server update <time>" (when the server last got this weather),
+         "Updating from server…" mid-refresh, or a permission/error prompt. Not tappable:
+         refreshing is the ↻ at the top-left; the rest of the widget opens the app. -->
     <TextView
         android:id="@+id/updatedText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="4dp"
         android:includeFontPadding="false"
         android:gravity="center"
         android:textColor="@color/retro_white_dim"
@@ -298,20 +293,5 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:text="" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/updatingText"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:includeFontPadding="false"
-        android:gravity="center"
-        android:textColor="@color/retro_cyan"
-        android:textStyle="bold"
-        android:textSize="15sp"
-        android:maxLines="1"
-        android:text="@string/widget_loading"
-        android:visibility="gone" />
-    </FrameLayout>
 
 </LinearLayout>

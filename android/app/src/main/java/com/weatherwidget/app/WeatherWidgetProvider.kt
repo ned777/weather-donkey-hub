@@ -26,8 +26,9 @@ import kotlin.math.roundToInt
 private enum class WidgetSizeTier { COMPACT, FULL }
 
 /**
- * The widget's brain. Tapping the "Tap to refresh" strip fetches fresh weather
- * (onReceive() below); tapping anywhere else opens the app. It also repaints
+ * The widget's brain. Tapping the ↻ at the top-left reloads this widget's weather
+ * from the server — the server's latest update, not a new fetch from the weather
+ * sources (onReceive() below); tapping anywhere else opens the app. It also repaints
  * whenever the app refreshes (pull-down); there is no timer. onUpdate() and onAppWidgetOptionsChanged() (called on
  * first placement, reboot, and resize) only ever repaint from whatever is
  * already cached.
@@ -41,6 +42,9 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_REFRESH = "com.weatherwidget.app.ACTION_REFRESH"
+
+        // Shortest time "Updating from server…" stays up after tapping ↻.
+        private const val MIN_UPDATING_MS = 1200L
 
         /**
          * Repaints every placed widget from whatever's cached, with no network call —
@@ -71,15 +75,18 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         }
 
         /**
-         * The actual fetch: for the "current" binding, a GPS location fix then
-         * Open-Meteo; for a widget bound to a searched city, straight to Open-Meteo
-         * using that city's fixed coordinates — no location permission needed at all
-         * for that case. Always called from a background Thread (see onReceive) —
-         * never the main thread. Pushes an "Updating…" frame immediately so the tap
-         * feels responsive even before the network call has finished.
+         * The ↻ tap: asks the server for its latest weather for this widget's place
+         * (fresh = false — the server's last update, not a new pull from the weather
+         * sources; the app's pull-down can do that). For the "current" binding a GPS fix
+         * comes first; a saved city uses its fixed coordinates. Always called from a
+         * background Thread (see onReceive) — never the main thread. Pushes an
+         * "Updating from server…" frame immediately so the tap feels responsive.
          */
         private fun performRefresh(context: Context, manager: AppWidgetManager, id: Int) {
             val locationId = WidgetLocationBinding.get(context, id)
+            // The server answers in a few ms on home Wi-Fi; hold "Updating from server…"
+            // at least this long so the tap visibly did something.
+            val showUntil = System.currentTimeMillis() + MIN_UPDATING_MS
 
             if (locationId == WeatherCache.CURRENT_LOCATION_ID) {
                 if (!LocationHelper.hasPermission(context)) {
@@ -97,8 +104,8 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
 
                 WeatherCache.saveCurrentCoords(context, location.latitude, location.longitude)
                 val cityName = GeocodeHelper.cityName(context, location)
-                val outcome = WeatherClient.fetchWeather(locationId, cityName, location.latitude, location.longitude, fresh = true)
-                finishRefresh(context, manager, id, locationId, cached, outcome, cityName)
+                val outcome = WeatherClient.fetchWeather(locationId, cityName, location.latitude, location.longitude, fresh = false)
+                finishRefresh(context, manager, id, locationId, cached, outcome, cityName, showUntil)
             } else {
                 val saved = LocationStore.list(context).find { it.id == locationId }
                 if (saved == null) {
@@ -110,8 +117,8 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 val cached = WeatherCache.read(context, locationId)?.forSource(SourcePreference.get(context))
                 manager.updateAppWidget(id, buildViews(context, manager, id, locationId, cached, context.getString(R.string.widget_loading)))
 
-                val outcome = WeatherClient.fetchWeather(locationId, saved.displayName, saved.lat, saved.lon, fresh = true)
-                finishRefresh(context, manager, id, locationId, cached, outcome, saved.displayName)
+                val outcome = WeatherClient.fetchWeather(locationId, saved.displayName, saved.lat, saved.lon, fresh = false)
+                finishRefresh(context, manager, id, locationId, cached, outcome, saved.displayName, showUntil)
             }
         }
 
@@ -119,8 +126,11 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         // failed refresh still shows when the last good data came in, not just "error".
         private fun finishRefresh(
             context: Context, manager: AppWidgetManager, id: Int, locationId: String,
-            cached: WeatherSnapshot?, outcome: WeatherClient.Outcome<WeatherSnapshot>, cityName: String?
+            cached: WeatherSnapshot?, outcome: WeatherClient.Outcome<WeatherSnapshot>, cityName: String?,
+            showUntil: Long = 0L
         ) {
+            val wait = showUntil - System.currentTimeMillis()
+            if (wait > 0) Thread.sleep(wait)
             when (outcome) {
                 is WeatherClient.Outcome.Ok -> {
                     val snapshot = outcome.value.copy(cityName = cityName ?: outcome.value.cityName)
@@ -135,9 +145,10 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        /** "15:45 · Nov 14 · PST", plus "· MET Norway only" when the server had to use its backup source. */
+        /** "Server update 15:45 · Nov 14 · PST" (when the server last got this weather from the
+         *  sources), plus "· MET Norway only" when the server had to use its backup source. */
         private fun statusFor(snapshot: WeatherSnapshot): String {
-            val stamp = WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt)
+            val stamp = "Server update ${WeatherFormat.lastUpdatedTimestamp(snapshot.fetchedAt)}"
             return snapshot.notice?.let { "$stamp · ${WeatherFormat.shortNotice(it)}" } ?: stamp
         }
 
@@ -225,10 +236,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.sunriseText, sunriseStr)
             views.setTextViewText(R.id.sunsetText, sunsetStr)
             views.setTextViewText(R.id.updatedText, statusText)
-            // While refreshing, "Updating…" (bigger) takes the place of both bottom lines.
-            val updating = statusText == context.getString(R.string.widget_loading)
-            views.setViewVisibility(R.id.refreshLines, if (updating) View.INVISIBLE else View.VISIBLE)
-            views.setViewVisibility(R.id.updatingText, if (updating) View.VISIBLE else View.GONE)
+            showUpdatingState(context, views, statusText)
             views.setTextViewText(R.id.forecast1Day, forecast1Day)
             views.setTextViewText(R.id.forecast1HighLow, forecast1HighLow)
             views.setTextViewText(R.id.forecast1Condition, forecast1Condition)
@@ -320,9 +328,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.wideSunsetText, sunLine("↓", snapshot?.sunset))
 
             views.setTextViewText(R.id.updatedText, statusText)
-            val updating = statusText == context.getString(R.string.widget_loading)
-            views.setViewVisibility(R.id.refreshLines, if (updating) View.INVISIBLE else View.VISIBLE)
-            views.setViewVisibility(R.id.updatingText, if (updating) View.VISIBLE else View.GONE)
+            showUpdatingState(context, views, statusText)
 
             setClickIntent(context, views, id, locationId)
             return views
@@ -438,9 +444,8 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 // that shared half is the real vertical budget each one has to fit within,
                 // not just an estimate.
                 val cityHeightPx = textHeightPx(context, todaySp, bold = true)
-                // The bottom strip: "Tap to refresh" + the updated line, with refreshArea's
-                // 2dp margin, 2dp+2dp padding and updatedText's 2dp margin (widget_weather.xml).
-                val updatedHeightPx = 2 * textHeightPx(context, 10f, bold = false) + dpToPx(context, 8)
+                // The bottom status line (one line of 10sp) plus its 4dp top margin (widget_weather.xml).
+                val updatedHeightPx = textHeightPx(context, 10f, bold = false) + dpToPx(context, 4)
                 val totalHeightPx = dpToPx(context, minHeightDp).toFloat()
                 val availableContentHeightPx = (
                     totalHeightPx - 2 * verticalPaddingPx - cityHeightPx -
@@ -495,7 +500,6 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 setSp(context, views, R.id.conditionText, conditionSp)
             }
             setSp(context, views, R.id.updatedText, 10f)
-            setSp(context, views, R.id.tapRefreshText, 10f)
 
             views.setViewVisibility(R.id.todayHighLowText, if (tier == WidgetSizeTier.FULL) View.VISIBLE else View.GONE)
             views.setViewVisibility(R.id.sunRow, if (tier == WidgetSizeTier.FULL) View.VISIBLE else View.GONE)
@@ -552,7 +556,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             return (sizeSp * (maxWidthPx / measured)).coerceAtLeast(minSp)
         }
 
-        // Two tap targets: the bottom "Tap to refresh" strip fetches fresh weather (or opens
+        // Two tap targets: the ↻ at the top-left reloads from the server (or opens
         // MainActivity to ask for location permission, since a widget can't show that
         // dialog itself); the rest of the widget opens the app.
         // A PendingIntent is a "voucher" for an Intent (Android's message for "do this
@@ -561,6 +565,13 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         // trigger it later, on our app's behalf, as if our own app had triggered it. This
         // is the only way a widget can respond to a tap, since RemoteViews content has no
         // click listeners of its own the way a normal button would.
+        /** While a refresh runs: ↻ turns yellow and the bottom line reads "Updating from server…" in cyan. */
+        private fun showUpdatingState(context: Context, views: RemoteViews, statusText: String) {
+            val updating = statusText == context.getString(R.string.widget_loading)
+            views.setTextColor(R.id.refreshIcon, context.getColor(if (updating) R.color.retro_yellow else R.color.retro_cyan))
+            views.setTextColor(R.id.updatedText, context.getColor(if (updating) R.color.retro_cyan else R.color.retro_white_dim))
+        }
+
         private fun setClickIntent(context: Context, views: RemoteViews, id: Int, locationId: String) {
             val openApp = PendingIntent.getActivity(
                 context, id,
@@ -569,8 +580,8 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             )
             // Anywhere on the widget opens the app…
             views.setOnClickPendingIntent(R.id.weatherWidgetRoot, openApp)
-            // …except the "Tap to refresh" / last-updated strip at the bottom, which fetches
-            // new weather (or opens the app to ask for location permission if it's still needed).
+            // …except the ↻ icon at the top-left, which reloads the weather from the server
+            // (or opens the app to ask for location permission if it's still needed).
             val needsPermission = locationId == WeatherCache.CURRENT_LOCATION_ID && !LocationHelper.hasPermission(context)
             val refresh = if (needsPermission) openApp else PendingIntent.getBroadcast(
                 context, id,
@@ -579,7 +590,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                     .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            views.setOnClickPendingIntent(R.id.refreshArea, refresh)
+            views.setOnClickPendingIntent(R.id.refreshIcon, refresh)
         }
     }
 

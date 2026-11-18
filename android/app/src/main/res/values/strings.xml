@@ -8,7 +8,8 @@
 
     <string name="grant_location">Grant Location Access</string>
     <string name="widget_need_permission">Tap to allow location</string>
-    <string name="widget_loading">Updating…</string>
+    <string name="widget_loading">Updating from server…</string>
+    <string name="widget_server_update">Server update</string>
     <string name="widget_error_no_location">Couldn\'t get location — tap to retry</string>
     <string name="widget_error_server">Server unreachable</string>
     <string name="app_error_server">Can\'t reach the Weather Donkey server — it only works on home Wi‑Fi</string>
@@ -50,11 +51,19 @@
     <string name="drawer_title">Locations</string>
     <string name="drawer_add">+ Add city</string>
     <string name="remove_city_confirm">Remove %1$s?</string>
-    <string name="widget_tap_refresh">Tap below to refresh</string>
     <string name="widget_label_wide">Weather Donkey Wide</string>
-    <string name="widget_wide_refresh">↻ REFRESH  ·  </string>
     <string name="save">Save</string>
     <string name="drawer_sorting">Drag to sort</string>
     <string name="refresh_working">Getting fresh weather from the hub</string>
+    <string name="refresh_ask_title">Update from…</string>
+    <string name="refresh_ask_sources">Weather sources</string>
+    <string name="refresh_ask_sources_detail">Server pulls new weather from Open-Meteo, MET Norway &amp; 7Timer! right now</string>
+    <string name="refresh_ask_server">Weather server</string>
+    <string name="refresh_ask_server_detail">Load the server\'s latest saved update (fast)</string>
+    <string name="refresh_working_sources">Server is getting new weather from the sources</string>
+    <string name="refresh_working_server">Loading the latest update from the server</string>
+    <string name="refresh_done_sources">✓ New weather from %1$s (via server)</string>
+    <string name="refresh_done_sources_generic">✓ New weather from the weather sources (via server)</string>
+    <string name="refresh_done_server">✓ Loaded the server\'s update from %1$s</string>
     <string name="refresh_done">Updated just now ✓</string>
 </resources>
