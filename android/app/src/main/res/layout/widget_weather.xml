@@ -25,9 +25,7 @@
     android:paddingEnd="16dp">
 
     <!-- Header: city name centered (max 10 chars, see WeatherWidgetProvider.widgetCityLabel()),
-         with the ↻ refresh icon laid over its left edge — tapping ↻ reloads this widget from
-         the server. The icon's tap box is bigger than the glyph; negative margins keep it
-         from making the header taller. -->
+         with "Refresh" over its left edge — tapping it reloads this widget from the server. -->
     <FrameLayout
         android:id="@+id/headerRow"
         android:layout_width="match_parent"
@@ -37,6 +35,7 @@
             android:id="@+id/cityText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
             android:gravity="center"
             android:includeFontPadding="false"
             android:textColor="@color/retro_white"
@@ -48,19 +47,16 @@
             android:text="@string/current_location" />
 
         <TextView
-            android:id="@+id/refreshIcon"
-            android:layout_width="36dp"
-            android:layout_height="32dp"
+            android:id="@+id/refreshButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_gravity="start|center_vertical"
-            android:layout_marginTop="-8dp"
-            android:layout_marginBottom="-8dp"
-            android:layout_marginStart="-8dp"
-            android:gravity="center"
+            android:paddingEnd="14dp"
             android:includeFontPadding="false"
             android:textColor="@color/retro_cyan"
             android:textStyle="bold"
-            android:textSize="16sp"
-            android:text="↻" />
+            android:textSize="10sp"
+            android:text="@string/widget_refresh" />
     </FrameLayout>
 
     <!-- baselineAligned="false" — otherwise Android vertically aligns this row's two
@@ -280,7 +276,7 @@
 
     <!-- Status line: "Server update <time>" (when the server last got this weather),
          "Updating from server…" mid-refresh, or a permission/error prompt. Not tappable:
-         refreshing is the ↻ at the top-left; the rest of the widget opens the app. -->
+         refreshing is "Refresh" at the top-left; the rest of the widget opens the app. -->
     <TextView
         android:id="@+id/updatedText"
         android:layout_width="match_parent"
