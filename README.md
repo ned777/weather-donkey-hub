@@ -78,7 +78,7 @@ Two widgets, both listed under **Weather Donkey** in the widget picker. Each ask
 - **Weather Donkey Wide** (4×2), same black card with a teal border:
     - **Top:** the city name, centered, the same distance below the border as the System Monitor widget's title (8dp top padding).
     - **Middle:** the current temperature (big, cyan) beside the condition (yellow) and today's high/low, centered left of a thin bright-teal divider; right of it, **Feels**, **Rain**, **Wind** (speed and direction) and **Humidity**, in a 144dp column set 12dp in from the right edge so there's a clear gap between each label and its value.
-    - **Bottom:** the next 5 days, each the day name over its high (white) over its low (dimmed), grouped a little closer together (14dp padding each side of the group), then sunrise ↑ and sunset ↓ stacked at the end of the row.
+    - **Bottom:** sunrise ↑ and sunset ↓ stacked at the start of the row, then a divider, then the next 5 days, each the day name over its high (white) over its low (dimmed), grouped a little closer together (14dp padding each side of the group).
     - **Divider lines** (beside the stats, above the 5 days, beside sunrise/sunset) are bright teal (80%), matching the Today + Calendar widget's divider.
     - Text sizes are shared with the Today + Calendar widget: temperature 60sp = its day number, city 14sp = its weekday.
     - **Top-left:** a big cyan **↻** (fingertip-sized tap area), level with the city name.

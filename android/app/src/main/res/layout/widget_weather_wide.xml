@@ -10,9 +10,9 @@
                                     | Wind     8 NW
                                     | Humidity    54%
     ─────────────────────────────────────────────────
-    WED   THU   FRI   SAT   SUN  |  ↑ 06:25
-    65°   65°   64°   ...        |  ↓ 16:49
-    57°   61°   56°   ... (low, dimmed)
+    ↑ 06:25  |  WED   THU   FRI   SAT   SUN
+    ↓ 16:49  |  65°   65°   64°   ...
+             |  57°   61°   56°   ... (low, dimmed)
     Server update 23:19 · Nov 15 · PST
 
   Tapping ↻ (top-left) reloads it from the server; the rest of the card opens the app.
@@ -270,15 +270,51 @@
         android:layout_marginBottom="5dp"
         android:background="@color/retro_teal_dim" />
 
-    <!-- Next 5 days (day, high, low — no icons), then sunrise/sunset in the same row. -->
+    <!-- Next 5 days (day, high, low — no icons), with sunrise/sunset at the start of the same row. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:baselineAligned="false">
+        <!-- Sunrise ↑ / sunset ↓ first, then a divider, then the 5 days. -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
+            <TextView
+                android:id="@+id/wideSunriseText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:text="↑ --:--" />
+            <TextView
+                android:id="@+id/wideSunsetText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-1dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/retro_white"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:text="↓ --:--" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="1dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="2dp"
+            android:background="@color/retro_teal_dim" />
+
         <!-- The 5 days, condensed: equal columns inside a padded group so they sit
-             closer together, centered left of the sunrise/sunset divider. -->
+             closer together, centered right of the sunrise/sunset divider. -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -482,41 +518,6 @@
                     android:singleLine="true"
                     android:text="--°" />
             </LinearLayout>
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="1dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="8dp"
-            android:background="@color/retro_teal_dim" />
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center_vertical">
-            <TextView
-                android:id="@+id/wideSunriseText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_white"
-                android:textStyle="bold"
-                android:textSize="13sp"
-                android:singleLine="true"
-                android:text="↑ --:--" />
-            <TextView
-                android:id="@+id/wideSunsetText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="-1dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/retro_white"
-                android:textStyle="bold"
-                android:textSize="13sp"
-                android:singleLine="true"
-                android:text="↓ --:--" />
         </LinearLayout>
     </LinearLayout>
 
