@@ -136,13 +136,13 @@
             android:layout_marginEnd="10dp"
             android:background="@color/retro_teal_dim" />
 
-        <!-- Feels / Rain / Wind / Humidity: 124dp wide with a 6dp right margin, so the
+        <!-- Feels / Rain / Wind / Humidity: 144dp wide with a 12dp right margin, so the
              labels sit further left, the values come in a little from the edge, and
              there's a wider gap between each label and its value. -->
         <LinearLayout
-            android:layout_width="124dp"
+            android:layout_width="144dp"
             android:layout_height="64dp"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="12dp"
             android:orientation="vertical">
             <LinearLayout
                 android:layout_width="match_parent"
