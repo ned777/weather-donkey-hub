@@ -23,15 +23,15 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_background_r26_inset"
-    android:paddingTop="0dp"
+    android:paddingTop="8dp"
     android:paddingBottom="10dp"
     android:paddingStart="20dp"
     android:paddingEnd="20dp">
 
     <!-- Header: a big ↻ refresh icon top-left (reloads from the server) in a 48x44dp
          fingertip-sized tap box, the city name centered, and a spacer on the right so the
-         city stays centered. The card has no top padding and the row is 37dp tall, which
-         puts the city name exactly where it was before the icon (10dp padding + its line). -->
+         city stays centered. 8dp top padding + the 37dp row puts the city name the same
+         distance below the border as the System Monitor widget's title. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
