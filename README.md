@@ -75,7 +75,7 @@ loaded, with *"Server unreachable"*.
 Two widgets, both listed under **Weather Donkey** in the widget picker. Each asks which location to show when you add it (Current or a saved city), follows the app's °F/°C and source choice, and has no timer.
 
 - **Weather Donkey** (2×2): city, current temperature with today's high/low, the condition, sunrise/sunset, and the next two days.
-- **Weather Donkey Wide** (4×2), same black card with a teal border:
+- **Weather Donkey Wide** (4×2, resizable), same black card with a teal border:
     - **Top:** the city name, centered, the same distance below the border as the System Monitor widget's title (8dp top padding).
     - **Middle:** the current temperature (big, cyan) beside the condition (yellow) and today's high/low, centered left of a thin bright-teal divider; right of it, **Feels**, **Rain**, **Wind** (speed and direction) and **Humidity**, in a 144dp column set 12dp in from the right edge so there's a clear gap between each label and its value.
     - **Bottom:** sunrise ↑ and sunset ↓ stacked at the start of the row, then a divider, then the next 5 days, each the day name over its high (white) over its low (dimmed), grouped a little closer together (14dp padding each side of the group).
@@ -84,6 +84,12 @@ Two widgets, both listed under **Weather Donkey** in the widget picker. Each ask
     - **Top-left:** a big cyan **↻** (fingertip-sized tap area), level with the city name.
     - **Footer:** **Server update** and the time the server last got this weather.
     - No icons or rain chances on this one. It's a quick temperature glance, and the app has the details.
+    - **Resizable** (long-press → drag the handles), down to 3 columns × 1 row. Smaller sizes drop whole sections instead of squeezing them (sizes on the phone's 5-column grid):
+        - **5 columns:** everything.
+        - **4 columns:** no Feels / Rain / Wind / Humidity column; the temperature group stays centered.
+        - **3 columns:** also no sunrise/sunset, only 4 forecast days, slightly smaller temperature.
+        - **1 row tall:** just the city, ↻ and the temperature row (no forecast or status line).
+      `buildWideViews()` reads the widget's size (`OPTION_APPWIDGET_MIN_WIDTH/HEIGHT`; One UI reports ~91dp per column, ~116dp per row) and redraws on every resize.
 
 Both widgets:
 
