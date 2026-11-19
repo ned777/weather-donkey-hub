@@ -130,6 +130,7 @@
 
         <!-- Thin teal divider. -->
         <TextView
+            android:id="@+id/wideStatsDivider"
             android:layout_width="1dp"
             android:layout_height="58dp"
             android:layout_marginStart="4dp"
@@ -140,6 +141,7 @@
              labels sit further left, the values come in a little from the edge, and
              there's a wider gap between each label and its value. -->
         <LinearLayout
+            android:id="@+id/wideStatsColumn"
             android:layout_width="144dp"
             android:layout_height="64dp"
             android:layout_marginEnd="12dp"
@@ -265,6 +267,7 @@
 
     <!-- Hairline above the hourly strip. -->
     <TextView
+        android:id="@+id/wideHairline"
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginBottom="5dp"
@@ -272,6 +275,7 @@
 
     <!-- Next 5 days (day, high, low — no icons), with sunrise/sunset at the start of the same row. -->
     <LinearLayout
+        android:id="@+id/wideForecastRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -279,6 +283,7 @@
         android:baselineAligned="false">
         <!-- Sunrise ↑ / sunset ↓ first, then a divider, then the 5 days. -->
         <LinearLayout
+            android:id="@+id/wideSunColumn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -307,6 +312,7 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/wideSunDivider"
             android:layout_width="1dp"
             android:layout_height="40dp"
             android:layout_marginStart="8dp"
@@ -441,6 +447,7 @@
                     android:text="--°" />
             </LinearLayout>
             <LinearLayout
+                android:id="@+id/wideDay3Col"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -480,6 +487,7 @@
                     android:text="--°" />
             </LinearLayout>
             <LinearLayout
+                android:id="@+id/wideDay4Col"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"

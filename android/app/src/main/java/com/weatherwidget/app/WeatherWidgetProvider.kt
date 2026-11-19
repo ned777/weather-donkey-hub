@@ -282,8 +282,33 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
 
             val tempStr = snapshot?.let { WeatherFormat.tempString(it.tempF, fahrenheit) } ?: "--°"
             views.setTextViewText(R.id.wideTempText, tempStr)
-            // 60sp, shrunk only if a 3-digit / negative reading wouldn't fit its ~112dp slot.
-            setSp(context, views, R.id.wideTempText, fitWidthSp(context, tempStr, dpToPx(context, 112).toFloat(), 60f, 34f, bold = true))
+            // Resized smaller → drop whole sections instead of squeezing everything in.
+            // One UI reports ~91dp per column and ~116dp per row (5-col grid: 2 cols =
+            // 160dp, 5 cols = 434dp), so: 5 cols = full, 4 cols = no Feels/Rain/Wind/
+            // Humidity column, 3 cols = also no sunrise/sunset and only 4 days; a 1-row
+            // height keeps just the header and the temperature row.
+            val options = manager.getAppWidgetOptions(id)
+            val widthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 434)
+            val heightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 233)
+            val showStats = widthDp >= 400
+            val narrow = widthDp < 300
+            val short = heightDp < 180
+            fun show(viewId: Int, visible: Boolean) =
+                views.setViewVisibility(viewId, if (visible) android.view.View.VISIBLE else android.view.View.GONE)
+            show(R.id.wideStatsDivider, showStats)
+            show(R.id.wideStatsColumn, showStats)
+            show(R.id.wideHairline, !short)
+            show(R.id.wideForecastRow, !short)
+            show(R.id.updatedText, !short)
+            show(R.id.wideSunColumn, !narrow)
+            show(R.id.wideSunDivider, !narrow)
+            show(R.id.wideDay4Col, !narrow)
+
+            // 60sp (44sp on a 1-row widget), shrunk only if a 3-digit / negative reading
+            // wouldn't fit its ~112dp slot (~80dp when narrow).
+            val tempMaxSp = if (short) 44f else 60f
+            val tempSlotDp = if (narrow) 80 else 112
+            setSp(context, views, R.id.wideTempText, fitWidthSp(context, tempStr, dpToPx(context, tempSlotDp).toFloat(), tempMaxSp, 30f, bold = true))
             views.setTextViewText(R.id.wideConditionText, snapshot?.condition?.label ?: "--")
             views.setTextViewText(
                 R.id.wideHighLowText,
