@@ -29,7 +29,8 @@ private enum class WidgetSizeTier { COMPACT, FULL }
  * The widget's brain. Tapping the ↻ at the top-left reloads this widget's weather
  * from the server — the server's latest update, not a new fetch from the weather
  * sources (onReceive() below); tapping anywhere else opens the app. It also repaints
- * whenever the app refreshes (pull-down); there is no timer. onUpdate() and onAppWidgetOptionsChanged() (called on
+ * whenever the app refreshes (pull-down), and every widget reloads from the server
+ * at exactly 12 AM and 12 PM phone time (WidgetRefreshScheduler.kt). onUpdate() and onAppWidgetOptionsChanged() (called on
  * first placement, reboot, and resize) only ever repaint from whatever is
  * already cached.
  */
@@ -57,6 +58,22 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             allWidgetIds(context, manager).forEach { renderFromCache(context, manager, it) }
         }
 
+        /**
+         * The 12 AM / 12 PM scheduled update (WidgetRefreshScheduler): reloads every placed
+         * widget from the server's latest data, the same path as the ↻ tap, just without
+         * holding up "Updating from server…" for show. Runs on a background thread.
+         */
+        fun refreshAllWidgets(context: Context) {
+            val manager = AppWidgetManager.getInstance(context)
+            allWidgetIds(context, manager).forEach { id ->
+                try {
+                    performRefresh(context, manager, id, minUpdatingMs = 0L)
+                } catch (e: Exception) {
+                    renderFromCache(context, manager, id)
+                }
+            }
+        }
+
         /** Called by WeatherWidgetConfigActivity right after binding a location to a brand-new widget id. */
         fun renderConfiguredWidget(context: Context, appWidgetId: Int) {
             renderFromCache(context, AppWidgetManager.getInstance(context), appWidgetId)
@@ -82,11 +99,11 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
          * background Thread (see onReceive) — never the main thread. Pushes an
          * "Updating from server…" frame immediately so the tap feels responsive.
          */
-        private fun performRefresh(context: Context, manager: AppWidgetManager, id: Int) {
+        private fun performRefresh(context: Context, manager: AppWidgetManager, id: Int, minUpdatingMs: Long = MIN_UPDATING_MS) {
             val locationId = WidgetLocationBinding.get(context, id)
             // The server answers in a few ms on home Wi-Fi; hold "Updating from server…"
             // at least this long so the tap visibly did something.
-            val showUntil = System.currentTimeMillis() + MIN_UPDATING_MS
+            val showUntil = System.currentTimeMillis() + minUpdatingMs
 
             if (locationId == WeatherCache.CURRENT_LOCATION_ID) {
                 if (!LocationHelper.hasPermission(context)) {
@@ -624,6 +641,15 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { renderFromCache(context, appWidgetManager, it) }
+        // Make sure the next 12 AM / 12 PM update is booked whenever a widget exists.
+        WidgetRefreshScheduler.schedule(context)
+    }
+
+    // Last widget of this size removed: drop the 12 AM / 12 PM alarm only if no
+    // widget of either size is left on the home screen.
+    override fun onDisabled(context: Context) {
+        val manager = AppWidgetManager.getInstance(context)
+        if (allWidgetIds(context, manager).isEmpty()) WidgetRefreshScheduler.cancel(context)
     }
 
     // Each removed widget's location binding is just dead weight once it's gone —
@@ -680,6 +706,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             // layout ("--") until something redraws it; repaint every placed
             // widget (both sizes) from cache right away.
             repaintAllWidgets(context)
+            WidgetRefreshScheduler.schedule(context)
         } else {
             super.onReceive(context, intent)
         }

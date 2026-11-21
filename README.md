@@ -27,7 +27,7 @@ that:
   never fetches; it shows the latest scheduled snapshot. ↻ Refresh fetches right away without
   moving the schedule. While it works, the ↻ spins, a bar slides under the Right Now
   header, the numbers dim and the status line says what's happening; it ends with
-  *"Updated just now ✓"*. The phone has no timer: it refreshes only on pull-down in the app
+  *"Updated just now ✓"*. The phone's only timer is the widgets' 12 AM / 12 PM server reload; otherwise it refreshes only on pull-down in the app
   (which asks: weather sources or weather server) or the widget's big ↻ (server's latest).
 - **Records the weather for its own location only.** Home is where
   this computer is, and it's recorded from every source that answers into a local SQLite
@@ -72,7 +72,7 @@ loaded, with *"Server unreachable"*.
 
 ## Home-screen widgets
 
-Two widgets, both listed under **Weather Donkey** in the widget picker. Each asks which location to show when you add it (Current or a saved city), follows the app's °F/°C and source choice, and has no timer.
+Two widgets, both listed under **Weather Donkey** in the widget picker. Each asks which location to show when you add it (Current or a saved city), follows the app's °F/°C and source choice, and reloads from the server at exactly 12 AM and 12 PM phone time.
 
 - **Weather Donkey** (2×2): city, current temperature with today's high/low, the condition, sunrise/sunset, and the next two days.
 - **Weather Donkey Wide** (4×2, resizable), same black card with a teal border:
@@ -96,6 +96,10 @@ Both widgets:
 - **Refreshing:** tap the big cyan **↻** at the top-left. It loads the **server's latest update** for that widget's location (it doesn't make the server pull new weather from the sources; pull down in the app for that). While it works the ↻ turns yellow and the bottom line reads **Updating from server…** in cyan, for at least 1.2 s so you can see it happen.
 - **Bottom line:** **Server update 15:00 · Nov 18 · PST**, the time the server last got that weather from the sources, plus a note if it had to use a backup source. It isn't tappable.
 - **Tapping anywhere else** opens the app.
+- **Updates at exactly 12 AM and 12 PM (phone time).** Every placed widget reloads the **server's latest update** at midnight and noon, the same call as the ↻ tap. The phone never asks the weather sources directly. It works the way the Today Calendar widget rolls over at midnight, so the widget doesn't lag behind:
+    - **Exact alarm.** `WidgetRefreshScheduler` keeps one exact, allow-while-idle alarm (`setExactAndAllowWhileIdle`) set for the next 00:00 or 12:00, so Doze can't delay it. When it fires, the widgets repaint from cache right away (so the forecast days move over even before the network answers), the next alarm is set, and then each widget loads from the server. `USE_EXACT_ALARM` is granted at install, so there's no settings prompt.
+    - **Follows the phone's clock.** `ScheduledRefreshReceiver` also listens for `TIME_SET`, `TIMEZONE_CHANGED`, `DATE_CHANGED`, `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED`. On any of those it repaints from cache and sets the alarm again from the new local time, so after a trip or clock change it still fires at that zone's midnight/noon, and a reboot doesn't wipe it. Opening the app and placing a widget set it again too, as a safety net.
+    - If the server can't be reached at that moment (away from home with no VPN), the widget keeps its cached weather and shows the usual error line, and tries again at the next 12.
 - **Forecast days that have already passed are skipped.** The forecast is stored from the day after it was fetched, so with an old cache (phone away from home with no VPN) the 5-day row starts at the next day still ahead and leaves the rest blank, instead of showing past days. A refresh on the home network fills it again.
 - **Repaint after an app update.** The launcher shows a widget's bare `--` layout after the app is reinstalled, so the app repaints every widget from cache as soon as it's updated (`MY_PACKAGE_REPLACED`).
 
@@ -193,7 +197,7 @@ an app tab, since it would duplicate Current. It adds a **What Was the Weather?*
 date and either a time or "Whole day", tap **Look Up**, and it shows the answer
 for whichever tab is open.
 
-There's no background timer on the phone, and opening the app doesn't refresh.
+The phone's only timer is the widgets' 12 AM / 12 PM server reload, and opening the app doesn't refresh.
 Weather refreshes only when you pull down in the app, or tap the big **↻** at the widget's top-left (tapping the rest
 of the widget opens the app). Pulling down opens an **Update from…** popup (black, neon pink border) with two buttons:
 **Weather sources** (the server pulls new weather from Open-Meteo, MET Norway & 7Timer! right now) or

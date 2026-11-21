@@ -20,6 +20,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--
+      Exact alarms for the widgets' 12 AM / 12 PM update (WidgetRefreshScheduler.kt),
+      so it lands on the minute instead of drifting under Doze.
+      USE_EXACT_ALARM is granted at install on Android 13+; SCHEDULE_EXACT_ALARM covers 12.
+      RECEIVE_BOOT_COMPLETED re-books the alarm after a restart, since reboots clear alarms.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:networkSecurityConfig="@xml/network_security_config"
@@ -68,8 +77,8 @@
           lifecycle broadcasts regardless of this flag).
             - APPWIDGET_UPDATE is the standard system broadcast.
             - com.weatherwidget.app.ACTION_REFRESH is OUR OWN broadcast, fired
-              only when the widget is tapped — there is no periodic timer
-              (see weather_widget_info.xml: updatePeriodMillis="0").
+              only when the widget's ↻ is tapped. The only timed update is the
+              12 AM / 12 PM one (ScheduledRefreshReceiver below); updatePeriodMillis="0".
         -->
         <receiver
             android:name=".WeatherWidgetProvider"
@@ -99,6 +108,25 @@
                 android:resource="@xml/weather_wide_widget_info" />
         </receiver>
 
+        <!--
+          The widgets' 12 AM / 12 PM update (WidgetRefreshScheduler.kt). It gets our own
+          exact alarm, plus the system broadcasts that clear the alarm or move "midnight":
+          reboot, clock change, timezone change, date rollover, app update. Those
+          system actions are exempt from Android 8's implicit-broadcast limits, the same
+          way the Today Calendar widget's DateChangeReceiver works.
+        -->
+        <receiver
+            android:name=".ScheduledRefreshReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.weatherwidget.app.ACTION_SCHEDULED_REFRESH" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

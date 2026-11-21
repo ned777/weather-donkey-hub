@@ -214,6 +214,9 @@ class MainActivity : AppCompatActivity() {
     // gets to do its own setup too.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Safety net: opening the app always re-books the widgets' 12 AM / 12 PM update,
+        // in case the OS ever dropped the alarm (WidgetRefreshScheduler.kt).
+        WidgetRefreshScheduler.schedule(this)
         // Turns res/layout/activity_main.xml into real on-screen View objects.
         setContentView(R.layout.activity_main)
 

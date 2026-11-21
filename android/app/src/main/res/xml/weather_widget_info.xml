@@ -8,10 +8,10 @@
   "exactly 2 columns by 2 rows," whatever that maps to in that launcher's own
   grid math.
 
-  updatePeriodMillis="0" — no OS timer at all. Weather can only change by
-  making a network call, and the whole point of this widget is that it never
-  does that on its own: it only refreshes when you tap it (see
-  WeatherWidgetProvider.kt). WeatherWidgetProvider still reads the actual
+  updatePeriodMillis="0" — no inexact OS timer (it drifts and can't hit a
+  set time). The widget reloads from the server when you tap ↻, and on its
+  own only at exactly 12 AM and 12 PM phone time, via an exact alarm (see
+  WidgetRefreshScheduler.kt). WeatherWidgetProvider still reads the actual
   reported size at render time and shrinks text/hides rows to fit it — see
   applyResponsiveSizing() — since different launchers can still render a
   "2x2" at different actual dp.
