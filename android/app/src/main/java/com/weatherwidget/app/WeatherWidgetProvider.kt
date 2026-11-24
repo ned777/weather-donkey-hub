@@ -67,7 +67,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             allWidgetIds(context, manager).forEach { id ->
                 try {
-                    performRefresh(context, manager, id, minUpdatingMs = 0L)
+                    performRefresh(context, manager, id, minUpdatingMs = 0L, fixTimeoutMs = LocationHelper.SCHEDULED_FIX_TIMEOUT_MS)
                 } catch (e: Exception) {
                     renderFromCache(context, manager, id)
                 }
@@ -99,7 +99,10 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
          * background Thread (see onReceive) — never the main thread. Pushes an
          * "Updating from server…" frame immediately so the tap feels responsive.
          */
-        private fun performRefresh(context: Context, manager: AppWidgetManager, id: Int, minUpdatingMs: Long = MIN_UPDATING_MS) {
+        private fun performRefresh(
+            context: Context, manager: AppWidgetManager, id: Int,
+            minUpdatingMs: Long = MIN_UPDATING_MS, fixTimeoutMs: Long? = null
+        ) {
             val locationId = WidgetLocationBinding.get(context, id)
             // The server answers in a few ms on home Wi-Fi; hold "Updating from server…"
             // at least this long so the tap visibly did something.
@@ -113,7 +116,11 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 val cached = WeatherCache.read(context, locationId)?.forSource(SourcePreference.get(context))
                 manager.updateAppWidget(id, buildViews(context, manager, id, locationId, cached, context.getString(R.string.widget_loading)))
 
-                val location = LocationHelper.getLocationBlocking(context)
+                // Where the phone is right now first, then ask the server for that spot.
+                // The server keys weather by coordinates: a place it already has comes
+                // straight back; a new one (just landed somewhere) it fetches and keeps.
+                val location = if (fixTimeoutMs != null) LocationHelper.getLocationBlocking(context, fixTimeoutMs)
+                    else LocationHelper.getLocationBlocking(context)
                 if (location == null) {
                     manager.updateAppWidget(id, buildViews(context, manager, id, locationId, cached, statusWithFallback(context, cached, context.getString(R.string.widget_error_no_location))))
                     return

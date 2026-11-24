@@ -201,11 +201,38 @@ class MainActivity : AppCompatActivity() {
             grantPermissionButton.visibility = if (granted) View.GONE else View.VISIBLE
             if (granted) {
                 startRefresh(fresh = pendingFreshRefresh)
+                askForBackgroundLocationOnce()
             } else {
                 swipeRefresh.isRefreshing = false
                 updatedText.text = getString(R.string.widget_error_no_location)
             }
         }
+
+    // "Allow all the time" location: on Android 11+ this opens the app's location
+    // settings page, where the user picks it. Nothing else to do with the answer.
+    private val backgroundLocationLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    /**
+     * The "Current" widget's 12 AM / 12 PM update runs while the app is closed, and
+     * Android only gives a closed app your location with "Allow all the time". Without
+     * it the widget stays on wherever the app was last opened (e.g. Seattle after
+     * you've flown home). Asked once, after the normal location permission.
+     */
+    private fun askForBackgroundLocationOnce() {
+        if (!LocationHelper.hasPermission(this) || LocationHelper.hasBackgroundPermission(this)) return
+        val prefs = getSharedPreferences("weather_prefs", MODE_PRIVATE)
+        if (prefs.getBoolean("asked_background_location", false)) return
+        prefs.edit().putBoolean("asked_background_location", true).apply()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.bg_location_title)
+            .setMessage(R.string.bg_location_message)
+            .setPositiveButton(R.string.bg_location_allow) { _, _ ->
+                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
+            .setNegativeButton(R.string.bg_location_not_now, null)
+            .show()
+    }
 
     // onCreate() is the first lifecycle method Android calls when this screen is
     // being built — the standard place to inflate the layout and wire everything up.
@@ -325,6 +352,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    
+        // Already had location from before this update? Ask for "all the time" once too.
+        askForBackgroundLocationOnce()
     }
 
     // Observes every touch the Activity sees (without consuming it — normal scrolling,

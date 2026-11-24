@@ -66,4 +66,8 @@
     <string name="refresh_done_sources_generic">✓ New weather from the weather sources (via server)</string>
     <string name="refresh_done_server">✓ Loaded the server\'s update from %1$s</string>
     <string name="refresh_done">Updated just now ✓</string>
+    <string name="bg_location_title">Keep the Current widget where you are</string>
+    <string name="bg_location_message">The widget updates itself at 12 AM and 12 PM while the app is closed. Android only shares your location then if you pick \"Allow all the time\". Otherwise the Current widget stays on wherever you last opened the app. It\'s still approximate location only.</string>
+    <string name="bg_location_allow">Open settings</string>
+    <string name="bg_location_not_now">Not now</string>
 </resources>

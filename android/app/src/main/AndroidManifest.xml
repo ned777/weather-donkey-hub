@@ -21,6 +21,12 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!--
+      "Allow all the time" location. The widgets' 12 AM / 12 PM update runs with the
+      app closed, and Android only gives a closed app a location with this. Without it
+      the "Current" widget sticks to wherever the app was last opened.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!--
       Exact alarms for the widgets' 12 AM / 12 PM update (WidgetRefreshScheduler.kt),
       so it lands on the minute instead of drifting under Doze.
       USE_EXACT_ALARM is granted at install on Android 13+; SCHEDULE_EXACT_ALARM covers 12.
