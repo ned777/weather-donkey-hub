@@ -186,8 +186,8 @@ export JAVA_HOME=<path to a JDK 17>
 The server address is `SERVER_URL` in `android/app/build.gradle.kts`. Plain
 HTTP is allowed only to that one address (`res/xml/network_security_config.xml`).
 
-The app screen uses the same card layout as the web page (pure black, teal-bordered
-cards): a one-line header with °F | °C, the location tabs, a **Right Now** card with
+The app screen uses the same card layout as the web page (pure black cards with a
+4dp teal outline, the same as the widget border): a one-line header with °F | °C, the location tabs, a **Right Now** card with
 source chips (Average · Open-Meteo · MET Norway · 7Timer!, each with its temperature),
 the outlined temperature beside the condition, an 8-box details grid, a sunrise/sunset
 bar and the moon (tonight's phase and % lit, then the next four main phases with dates), then **Next 12 Hours**, **5-Day Forecast** (with range bars), **What Was the
