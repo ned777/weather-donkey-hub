@@ -59,6 +59,8 @@ phone (app + widget)  ──home Wi‑Fi──▶  Weather Donkey Hub :8094  ─
   On a narrow window the city tabs wrap onto extra rows (and scroll up/down if
   there are many), and every scrollbar on the page is big (20px) and orange. The sideways bar under Next 12 Hours
   is drawn by the page itself so it never fades away; up/down bars may fade.
+  The Next 12 Hours strip is set 8px in from the card edges so it never slides over
+  the border line, and the lines between hours stop short of the lines above and below.
 - **Keeps the app and the web page in sync.** Cities added or removed on either
   one carry over to the other on the app's next pull-to-refresh.
 - **Finds history for any spot.** Lookups within 10 km of Home use the
@@ -191,7 +193,8 @@ cards): a one-line header with °F | °C, the location tabs, a **Right Now** car
 source chips (Average · Open-Meteo · MET Norway · 7Timer!, each with its temperature),
 the outlined temperature beside the condition, an 8-box details grid, a sunrise/sunset
 bar and the moon (tonight's phase and % lit, then the next four main phases with dates), then **Next 12 Hours**, **5-Day Forecast** (with range bars), **What Was the
-Weather?** and the converter. Tapping a source chip switches the app (and the widget)
+Weather?** and the converter. The Next 12 Hours strip sits 8dp in from the card sides
+and 6dp up from the bottom so it never slides over the border line. Tapping a source chip switches the app (and the widget)
 to that source's own forecast; Average is the default. It keeps everything the original
 had: location tabs, pull-to-refresh, the outlined temperature, °F/°C and per-widget locations. One pull-to-refresh now updates **every tab at once**
 (in parallel, all through the server), sideways swipes never trigger a refresh,
